@@ -606,11 +606,38 @@ function syncActiveUrl() {
 async function copyShareUrl() {
   const includeEndDate = includeEndDateEl ? includeEndDateEl.checked : true;
   const url = buildShareUrl(includeEndDate);
+
+  const flashShareButton = (label) => {
+    if (!shareLinkBtn) return;
+    const old = shareLinkBtn.textContent;
+    shareLinkBtn.textContent = label;
+    shareLinkBtn.style.pointerEvents = 'none';
+    setTimeout(() => {
+      shareLinkBtn.textContent = old;
+      shareLinkBtn.style.pointerEvents = '';
+    }, 1200);
+  };
+
   try {
-    await navigator.clipboard.writeText(url);
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('copy failed');
+    }
     setFetchPlayerStatus('Link kopieret', 'ok');
+    flashShareButton('Kopieret');
   } catch (_) {
     setFetchPlayerStatus('Kunne ikke kopiere link', 'err');
+    flashShareButton('Fejl');
   }
 }
 
