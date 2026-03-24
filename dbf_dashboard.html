@@ -3,55 +3,178 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DBf Analyzer Dashboard</title>
+<title>DBf Analyseværktøjer</title>
 <link rel="stylesheet" href="./css/analyzer-theme.css">
 <link rel="stylesheet" href="./css/dbf_dashboard.css">
 <script>if(localStorage.getItem('dbf_theme')!=='light')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','light');</script>
 </head>
 <body>
-<main class="page dashboard-page">
-  <header class="page-header">
-    <div>
-      <h1 class="page-title">DBf Analyzer Dashboard</h1>
-      <p class="page-subtitle">Sammenligning og fordeling side om side</p>
-    </div>
-    <div class="actions">
-      <button class="btn" id="stackBtn" type="button">Stakket visning</button>
-      <button class="btn" id="sideBySideBtn" type="button">Side om side</button>
-      <button class="btn" id="reloadBtn" type="button">Genindlæs paneler</button>
-    </div>
+
+<div class="portal">
+
+  <header class="hero">
+    <p class="hero-eyebrow">Det Danske Bridgeforbund</p>
+    <h1 class="hero-title">Handicap<span class="hero-accent">Analyzere</span></h1>
+    <p class="hero-sub">To lokale analyseværktøjer til DBf-handicapdata.<br>Alt behandles i din browser — ingen data forlader din computer.</p>
   </header>
 
-  <section id="dashboardGrid" class="dashboard-grid">
-    <article class="dashboard-card card">
-      <div class="card-head">
-        <div>
-          <h2>Handicap Sammenligning</h2>
-          <p>Upload spillerfiler og sammenlign udvikling</p>
-        </div>
-        <a href="./dbf_handicap.html" target="_blank" rel="noopener noreferrer">Åbn separat</a>
+  <section class="tool-grid" aria-label="Tilgængelige analyseværktøjer">
+
+    <!-- ── Tool 1: Sammenligning ───────────────────────────────── -->
+    <article class="tool-card">
+      <div class="tool-screen" aria-hidden="true">
+        <svg class="preview-svg" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Linjediagram med tre spilleres handicapudvikling">
+          <!-- grid -->
+          <line x1="20" y1="22" x2="265" y2="22" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="20" y1="52" x2="265" y2="52" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="20" y1="82" x2="265" y2="82" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="20" y1="112" x2="265" y2="112" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+          <!-- player 1 area fill (teal, improving) -->
+          <path d="M 20,88 C 38,88 54,80 76,80 C 98,80 114,72 136,72 C 158,72 174,62 196,62 C 216,62 232,52 252,44 L 252,112 L 20,112 Z"
+                fill="url(#fillTeal)" opacity="0.18"/>
+          <!-- player 1 line -->
+          <path d="M 20,88 C 38,88 54,80 76,80 C 98,80 114,72 136,72 C 158,72 174,62 196,62 C 216,62 232,52 252,44"
+                fill="none" stroke="#14b8a6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- player 2 area fill (amber, slight rise) -->
+          <path d="M 20,65 C 38,65 54,72 76,72 C 98,72 114,68 136,76 C 158,76 174,70 196,78 C 216,78 232,72 252,80 L 252,112 L 20,112 Z"
+                fill="url(#fillAmber)" opacity="0.12"/>
+          <!-- player 2 line -->
+          <path d="M 20,65 C 38,65 54,72 76,72 C 98,72 114,68 136,76 C 158,76 174,70 196,78 C 216,78 232,72 252,80"
+                fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- player 3 line (blue, stable) -->
+          <path d="M 20,104 C 38,104 54,100 76,98 C 98,98 114,102 136,99 C 158,99 174,102 196,97 C 216,97 232,100 252,96"
+                fill="none" stroke="#60a5fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 3"/>
+          <!-- dots: player 1 -->
+          <circle cx="20"  cy="88" r="3" fill="#14b8a6"/>
+          <circle cx="76"  cy="80" r="3" fill="#14b8a6"/>
+          <circle cx="136" cy="72" r="3" fill="#14b8a6"/>
+          <circle cx="196" cy="62" r="3" fill="#14b8a6"/>
+          <circle cx="252" cy="44" r="3" fill="#14b8a6"/>
+          <!-- dots: player 2 -->
+          <circle cx="20"  cy="65" r="3" fill="#f59e0b"/>
+          <circle cx="76"  cy="72" r="3" fill="#f59e0b"/>
+          <circle cx="136" cy="76" r="3" fill="#f59e0b"/>
+          <circle cx="252" cy="80" r="3" fill="#f59e0b"/>
+          <!-- axis labels -->
+          <text x="20"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jan</text>
+          <text x="70"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">apr</text>
+          <text x="124" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jul</text>
+          <text x="178" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">okt</text>
+          <text x="232" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jan</text>
+          <!-- legend dots -->
+          <circle cx="20" cy="14" r="3.5" fill="#14b8a6"/>
+          <text x="27" y="17" font-family="IBM Plex Mono,monospace" font-size="7.5" fill="rgba(255,255,255,0.45)">A. Hansen</text>
+          <circle cx="90" cy="14" r="3.5" fill="#f59e0b"/>
+          <text x="97" y="17" font-family="IBM Plex Mono,monospace" font-size="7.5" fill="rgba(255,255,255,0.45)">B. Nielsen</text>
+          <circle cx="160" cy="14" r="3.5" fill="#60a5fa"/>
+          <text x="167" y="17" font-family="IBM Plex Mono,monospace" font-size="7.5" fill="rgba(255,255,255,0.45)">C. Sørensen</text>
+          <defs>
+            <linearGradient id="fillTeal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#14b8a6"/>
+              <stop offset="100%" stop-color="#14b8a6" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="fillAmber" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f59e0b"/>
+              <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
-      <div class="frame-wrap">
-        <iframe id="comparisonFrame" src="./dbf_handicap.html" title="DBf Handicap Sammenligning"></iframe>
+      <div class="tool-body">
+        <div class="tool-meta">
+          <span class="tool-tag tag-teal">Spilleranalyse</span>
+        </div>
+        <h2 class="tool-name">Handicap&shy;sammenligning</h2>
+        <p class="tool-desc">Sammenlign op til ni spilleres handicapudvikling side om side. Upload individuelle spillerfiler fra bridge.dk og visualiser tendenser over valgfrie tidsperioder.</p>
+        <ul class="feature-list">
+          <li>Op til 9 spillere på ét diagram</li>
+          <li>Filtrer på datointerval og granularitet (dag / uge / måned / kvartal / år)</li>
+          <li>Statistik per spiller: gennemsnit, min, max og samlet sænkning</li>
+          <li>Justerbar kurveglattning</li>
+        </ul>
+        <div class="tool-footer">
+          <div class="datasource">
+            <span class="ds-label">Datakilde</span>
+            <code>LookUpHAC.php?DBFNr=XXXXX</code>
+          </div>
+          <a class="cta-btn" href="./dbf_handicap.html">
+            Åbn værktøj
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
       </div>
     </article>
 
-    <article class="dashboard-card card">
-      <div class="card-head">
-        <div>
-          <h2>Handicap Fordeling</h2>
-          <p>Upload HACAlle-fil og udforsk klubfordeling</p>
-        </div>
-        <a href="./dbf_handicap_histogram.html" target="_blank" rel="noopener noreferrer">Åbn separat</a>
+    <!-- ── Tool 2: Fordeling ───────────────────────────────────── -->
+    <article class="tool-card">
+      <div class="tool-screen" aria-hidden="true">
+        <svg class="preview-svg" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Histogram over handicapfordeling">
+          <!-- grid lines -->
+          <line x1="18" y1="20" x2="265" y2="20" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="18" y1="50" x2="265" y2="50" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="18" y1="80" x2="265" y2="80" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+          <line x1="18" y1="110" x2="265" y2="110" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+          <!-- bars (bell-ish, slightly right-skewed) -->
+          <rect x="20"  y="100" width="22" height="10"  rx="2" fill="#14b8a6" opacity="0.55"/>
+          <rect x="46"  y="84"  width="22" height="26"  rx="2" fill="#14b8a6" opacity="0.62"/>
+          <rect x="72"  y="63"  width="22" height="47"  rx="2" fill="#14b8a6" opacity="0.70"/>
+          <rect x="98"  y="38"  width="22" height="72"  rx="2" fill="#14b8a6" opacity="0.78"/>
+          <rect x="124" y="20"  width="22" height="90"  rx="2" fill="#14b8a6" opacity="0.90"/>
+          <rect x="150" y="30"  width="22" height="80"  rx="2" fill="#14b8a6" opacity="0.85"/>
+          <rect x="176" y="52"  width="22" height="58"  rx="2" fill="#14b8a6" opacity="0.75"/>
+          <rect x="202" y="72"  width="22" height="38"  rx="2" fill="#14b8a6" opacity="0.65"/>
+          <rect x="228" y="90"  width="22" height="20"  rx="2" fill="#14b8a6" opacity="0.58"/>
+          <!-- distribution curve overlay -->
+          <path d="M 20,108 C 35,105 45,88 57,78 C 72,64 90,42 109,26 C 126,12 140,12 159,22 C 178,34 196,56 213,74 C 228,90 242,102 252,108"
+                fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+          <!-- active club selection highlight on bar 5 -->
+          <rect x="124" y="20" width="22" height="90" rx="2" fill="none" stroke="#2dd4bf" stroke-width="1.5" opacity="0.8"/>
+          <!-- axis labels -->
+          <text x="20"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">-10</text>
+          <text x="72"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">20</text>
+          <text x="124" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">50</text>
+          <text x="176" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">80</text>
+          <text x="228" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">110</text>
+          <!-- stats callout -->
+          <rect x="188" y="16" width="72" height="36" rx="5" fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.3)" stroke-width="1"/>
+          <text x="196" y="28" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.5)">median</text>
+          <text x="196" y="40" font-family="IBM Plex Mono,monospace" font-size="11" font-weight="600" fill="#2dd4bf">47.2</text>
+          <text x="224" y="40" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.4)">n=8 214</text>
+        </svg>
       </div>
-      <div class="frame-wrap">
-        <iframe id="histogramFrame" src="./dbf_handicap_histogram.html" title="DBf Handicap Fordeling"></iframe>
+      <div class="tool-body">
+        <div class="tool-meta">
+          <span class="tool-tag tag-amber">Klubanalyse</span>
+        </div>
+        <h2 class="tool-name">Handicap&shy;fordeling</h2>
+        <p class="tool-desc">Udforsk handicapfordelingen på tværs af alle danske bridgeklubber. Upload HACAlle-filen én gang og filtrer interaktivt på klub og histogram-opløsning.</p>
+        <ul class="feature-list">
+          <li>Histogram over hele DBf's handicapspænd</li>
+          <li>Søg og filtrer ned til enkelt klub</li>
+          <li>Statistik: spredning, median, min/max per klub</li>
+          <li>24-timers lokal cache — ingen genupload nødvendig</li>
+        </ul>
+        <div class="tool-footer">
+          <div class="datasource">
+            <span class="ds-label">Datakilde</span>
+            <code>HACAlle.php</code>
+          </div>
+          <a class="cta-btn" href="./dbf_handicap_histogram.html">
+            Åbn værktøj
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
       </div>
     </article>
-  </section>
-</main>
 
-<script src="./js/dbf_dashboard.js"></script>
+  </section><!-- /.tool-grid -->
+
+  <footer class="portal-footer">
+    <p>Data hentes fra <a href="https://bridge.dk" target="_blank" rel="noopener noreferrer">bridge.dk</a> og behandles udelukkende lokalt i din browser — intet sendes til en ekstern server.</p>
+  </footer>
+
+</div><!-- /.portal -->
+
 <script src="./js/theme.js"></script>
 </body>
 </html>
