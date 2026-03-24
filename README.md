@@ -29,3 +29,17 @@ By default, `npm run dev` starts on port 4173.
 - `GET /api/lookup?dbfNr=78976` -> fetches `https://medlemmer.bridge.dk/LookUpHAC.php?DBFNr=78976`
 
 Both frontend analyzers now use these local endpoints when you click the DBf fetch buttons.
+
+## Deploy on Render (from GitHub)
+This is the easiest way to host this project publicly while keeping the relay API endpoints (`/api/hacalle` and `/api/lookup`).
+
+1. Push this repository to GitHub.
+2. Go to Render and choose New + -> Blueprint.
+3. Connect your GitHub account and select this repository.
+4. Render will detect `render.yaml` and create the web service automatically.
+5. Click Deploy.
+
+Notes:
+- `render.yaml` sets `HOST=0.0.0.0` so the service is reachable on Render.
+- Render injects `PORT` automatically, and `server.js` already uses it.
+- Default landing page is `dbf_dashboard.html` (set via `OPEN_PAGE`).
