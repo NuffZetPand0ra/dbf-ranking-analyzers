@@ -30,6 +30,10 @@ const pillRowEl = document.getElementById('pill-row');
 const fileInputEl = document.getElementById('file-input');
 const addBtnEl = document.getElementById('add-btn');
 const datePresetSelect = document.getElementById('date-preset');
+const shareLinkBtn = document.getElementById('share-link-btn');
+const includeEndDateEl = document.getElementById('include-end-date');
+
+let isRestoringState = false;
 
 function setFetchPlayerStatus(msg, type) {
   if (!fetchPlayerStatus) return;
@@ -75,8 +79,59 @@ async function fetchLookupHtml(dbfNr) {
   return { html, source: 'backend' };
 }
 
+async function addPlayerByDbfNr(dbfNr, options) {
+  const opts = options || {};
+  const showUi = opts.showUi !== false;
+  const skipRender = opts.skipRender === true;
+  const selectInput = opts.selectInput === true;
+  const normalized = normalizeDbfNr(dbfNr);
+  if (!normalized) throw new Error('Indtast et DBfNr');
+
+  let originalLabel = '';
+  if (showUi && fetchPlayerBtn) {
+    originalLabel = fetchPlayerBtn.textContent;
+    fetchPlayerBtn.textContent = 'Henter...';
+    fetchPlayerBtn.style.pointerEvents = 'none';
+    setFetchPlayerStatus('Henter spiller fra DBf...', '');
+  }
+
+  try {
+    let html;
+    let source;
+    const cached = readLookupCache(normalized);
+    if (cached) {
+      html = cached.html;
+      source = 'cache';
+    } else {
+      const fetched = await fetchLookupHtml(normalized);
+      html = fetched.html;
+      source = fetched.source;
+      writeLookupCache(normalized, html, source);
+    }
+
+    const parsed = parseHtml(html, 'DBF-' + normalized + '.html');
+    if (!parsed.entries.length) throw new Error('Ingen handicap-data fundet for DBfNr ' + normalized);
+    const withMeta = { ...parsed, dbfNr: normalized };
+    const idx = players.findIndex(p => p.dbfNr === normalized || p.name === parsed.name);
+    if (idx >= 0) players.splice(idx, 1, withMeta); else players.push(withMeta);
+
+    if (!skipRender) {
+      updateDateRange();
+      rebuildPills();
+      render();
+    }
+    if (showUi) setFetchPlayerStatus('Indlaest: ' + withMeta.name + ' (' + source + ')', 'ok');
+    if (showUi && selectInput && dbfNumberInput) dbfNumberInput.select();
+  } finally {
+    if (showUi && fetchPlayerBtn) {
+      fetchPlayerBtn.textContent = originalLabel;
+      fetchPlayerBtn.style.pointerEvents = '';
+    }
+  }
+}
+
 async function addPlayerFromDbfNumber() {
-  if (!dbfNumberInput || !fetchPlayerBtn) return;
+  if (!dbfNumberInput) return;
   const dbfNr = normalizeDbfNr(dbfNumberInput.value);
   if (!dbfNr) {
     setFetchPlayerStatus('Indtast et DBfNr', 'err');
@@ -84,42 +139,11 @@ async function addPlayerFromDbfNumber() {
     return;
   }
 
-  const originalLabel = fetchPlayerBtn.textContent;
-  fetchPlayerBtn.textContent = 'Henter...';
-  fetchPlayerBtn.style.pointerEvents = 'none';
-  setFetchPlayerStatus('Henter spiller fra DBf...', '');
-
   try {
-    let html;
-    let source;
-    const cached = readLookupCache(dbfNr);
-    if (cached) {
-      html = cached.html;
-      source = 'cache';
-    } else {
-      const fetched = await fetchLookupHtml(dbfNr);
-      html = fetched.html;
-      source = fetched.source;
-      writeLookupCache(dbfNr, html, source);
-    }
-
-    const parsed = parseHtml(html, 'DBF-' + dbfNr + '.html');
-    if (!parsed.entries.length) throw new Error('Ingen handicap-data fundet for DBfNr ' + dbfNr);
-    const withMeta = { ...parsed, dbfNr };
-    const idx = players.findIndex(p => p.dbfNr === dbfNr || p.name === parsed.name);
-    if (idx >= 0) players.splice(idx, 1, withMeta); else players.push(withMeta);
-
-    updateDateRange();
-    rebuildPills();
-    render();
-    setFetchPlayerStatus('Indlæst: ' + withMeta.name + ' (' + source + ')', 'ok');
-    dbfNumberInput.select();
+    await addPlayerByDbfNr(dbfNr, { showUi: true, selectInput: true });
   } catch (err) {
     setFetchPlayerStatus('Kunne ikke hente spiller', 'err');
     alert('Kunne ikke hente DBf data: ' + err.message + '\n\nDu kan stadig uploade den gemte HTML-fil manuelt.');
-  } finally {
-    fetchPlayerBtn.textContent = originalLabel;
-    fetchPlayerBtn.style.pointerEvents = '';
   }
 }
 
@@ -128,6 +152,7 @@ if (btnPoints) {
     showPoints = !showPoints;
     btnPoints.classList.toggle('on', showPoints);
     updatePointStyles();
+    syncActiveUrl();
   });
 }
 
@@ -139,6 +164,7 @@ if (btnHover) {
       chart.options.plugins.tooltip.enabled = showHover;
       chart.update('none');
     }
+    syncActiveUrl();
   });
 }
 
@@ -416,6 +442,7 @@ function render() {
       chart.destroy();
       chart = null;
     }
+    syncActiveUrl();
     return;
   }
 
@@ -471,9 +498,16 @@ function render() {
       }
     });
   }
+
+  syncActiveUrl();
 }
 
-[fromDateEl, toDateEl, granularityEl].forEach(el => el.addEventListener('change', render));
+fromDateEl.addEventListener('change', render);
+toDateEl.addEventListener('change', () => {
+  if (includeEndDateEl) includeEndDateEl.checked = true;
+  render();
+});
+granularityEl.addEventListener('change', render);
 tensionEl.addEventListener('input', render);
 
 if (datePresetSelect) {
@@ -487,6 +521,7 @@ if (datePresetSelect) {
 
     fromDateEl.value = from.toISOString().slice(0, 10);
     toDateEl.value = today.toISOString().slice(0, 10);
+    if (includeEndDateEl) includeEndDateEl.checked = true;
     datePresetSelect.value = '';
     render();
   });
@@ -533,6 +568,99 @@ function clearClientCaches() {
     }
     toRemove.forEach(k => localStorage.removeItem(k));
   } catch (_) {}
+}
+
+function buildStateParams(includeEndDate) {
+  const params = new URLSearchParams();
+  const dbfPlayers = players.map(p => p.dbfNr).filter(Boolean);
+  if (dbfPlayers.length) params.set('p', dbfPlayers.join(','));
+  if (fromDateEl.value) params.set('from', fromDateEl.value);
+  if (includeEndDate && toDateEl.value) params.set('to', toDateEl.value);
+
+  if (granularityEl.value && granularityEl.value !== 'month') params.set('g', granularityEl.value);
+  if (tensionEl.value && tensionEl.value !== '0.1') params.set('t', tensionEl.value);
+  if (!showPoints) params.set('sp', '0');
+  if (!showHover) params.set('sh', '0');
+
+  const hiddenDbf = players
+    .map((p, i) => (hiddenPlayers.has(i) ? p.dbfNr : null))
+    .filter(Boolean);
+  if (hiddenDbf.length) params.set('h', hiddenDbf.join(','));
+  return params;
+}
+
+function buildShareUrl(includeEndDate) {
+  const params = buildStateParams(includeEndDate);
+  const qs = params.toString();
+  return window.location.origin + window.location.pathname + (qs ? '?' + qs : '');
+}
+
+function syncActiveUrl() {
+  if (isRestoringState) return;
+  const includeEndDate = includeEndDateEl ? includeEndDateEl.checked : true;
+  const url = buildShareUrl(includeEndDate);
+  const relative = url.replace(window.location.origin, '');
+  window.history.replaceState({}, '', relative);
+}
+
+async function copyShareUrl() {
+  const includeEndDate = includeEndDateEl ? includeEndDateEl.checked : true;
+  const url = buildShareUrl(includeEndDate);
+  try {
+    await navigator.clipboard.writeText(url);
+    setFetchPlayerStatus('Link kopieret', 'ok');
+  } catch (_) {
+    setFetchPlayerStatus('Kunne ikke kopiere link', 'err');
+  }
+}
+
+async function restoreStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.toString()) return;
+
+  isRestoringState = true;
+  try {
+    const g = params.get('g');
+    if (g && Array.from(granularityEl.options).some(o => o.value === g)) granularityEl.value = g;
+
+    const t = params.get('t');
+    if (t && !Number.isNaN(parseFloat(t))) tensionEl.value = t;
+
+    const from = params.get('from');
+    if (from) fromDateEl.value = from;
+    const to = params.get('to');
+    if (to) {
+      toDateEl.value = to;
+      if (includeEndDateEl) includeEndDateEl.checked = true;
+    }
+
+    showPoints = params.get('sp') !== '0';
+    showHover = params.get('sh') !== '0';
+    if (btnPoints) btnPoints.classList.toggle('on', showPoints);
+    if (btnHover) btnHover.classList.toggle('on', showHover);
+
+    const p = (params.get('p') || '').split(',').map(normalizeDbfNr).filter(Boolean);
+    if (p.length) {
+      for (const dbfNr of p) {
+        try {
+          await addPlayerByDbfNr(dbfNr, { showUi: false, skipRender: true });
+        } catch (_) {}
+      }
+    }
+
+    const hidden = new Set((params.get('h') || '').split(',').map(normalizeDbfNr).filter(Boolean));
+    hiddenPlayers.clear();
+    players.forEach((player, idx) => {
+      if (player.dbfNr && hidden.has(player.dbfNr)) hiddenPlayers.add(idx);
+    });
+
+    updateDateRange();
+    rebuildPills();
+    render();
+    if (players.length) setFetchPlayerStatus('Link indlaest', 'ok');
+  } finally {
+    isRestoringState = false;
+  }
 }
 
 async function fetchAllPlayers() {
@@ -686,5 +814,19 @@ if (clearPlayerCacheBtn) {
   });
 }
 
+if (shareLinkBtn) {
+  shareLinkBtn.addEventListener('click', () => {
+    copyShareUrl();
+  });
+}
+
+if (includeEndDateEl) {
+  includeEndDateEl.addEventListener('change', () => {
+    syncActiveUrl();
+  });
+}
+
 // Pre-fetch player list on load for autocomplete
-fetchAllPlayers();
+restoreStateFromUrl().finally(() => {
+  fetchAllPlayers();
+});
