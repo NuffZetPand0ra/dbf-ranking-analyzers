@@ -23,6 +23,8 @@ let numBins = 62;
 let percentageMode = false;
 let chart = null;
 let chartResizeObserver = null;
+let isRestoringState = false;
+let pendingUrlState = null;
 
 const searchEl = document.getElementById('clubSearch');
 const dropEl = document.getElementById('clubDropdown');
@@ -32,6 +34,7 @@ const helpBtn = document.getElementById('helpBtn');
 const closeOverlayBtn = document.getElementById('closeOverlay');
 const uploadBtnBig = document.getElementById('uploadBtnBig');
 const fetchRemoteBtn = document.getElementById('fetchRemoteBtn');
+const shareLinkBtn = document.getElementById('shareLinkBtn');
 const fetchStatus = document.getElementById('fetchStatus');
 
 function setFetchStatus(msg, type) {
@@ -90,6 +93,117 @@ function parseHACHtml(html) {
   return clubs;
 }
 
+function buildStateParams() {
+  const params = new URLSearchParams();
+  const hcMin = document.getElementById('hcMin').value;
+  const hcMax = document.getElementById('hcMax').value;
+  if (hcMin) params.set('min', hcMin);
+  if (hcMax) params.set('max', hcMax);
+  if (numBins !== 62) params.set('bins', String(numBins));
+  if (percentageMode) params.set('pct', '1');
+  selectedClubs.forEach(club => params.append('club', club));
+  return params;
+}
+
+function buildShareUrl() {
+  const qs = buildStateParams().toString();
+  return window.location.origin + window.location.pathname + (qs ? '?' + qs : '');
+}
+
+function syncActiveUrl() {
+  if (isRestoringState) return;
+  const relative = buildShareUrl().replace(window.location.origin, '');
+  window.history.replaceState({}, '', relative);
+}
+
+async function copyShareUrl() {
+  const url = buildShareUrl();
+
+  const flashShareButton = (label) => {
+    if (!shareLinkBtn) return;
+    const old = shareLinkBtn.textContent;
+    shareLinkBtn.textContent = label;
+    shareLinkBtn.style.pointerEvents = 'none';
+    setTimeout(() => {
+      shareLinkBtn.textContent = old;
+      shareLinkBtn.style.pointerEvents = '';
+    }, 1200);
+  };
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (!ok) throw new Error('copy failed');
+    }
+    setFetchStatus('Link kopieret', 'ok');
+    flashShareButton('Kopieret');
+  } catch (_) {
+    setFetchStatus('Kunne ikke kopiere link', 'err');
+    flashShareButton('Fejl');
+  }
+}
+
+function restoreStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.toString()) return;
+  pendingUrlState = {
+    min: params.get('min'),
+    max: params.get('max'),
+    bins: params.get('bins'),
+    pct: params.get('pct') === '1',
+    clubs: params.getAll('club')
+  };
+}
+
+function applyPendingUrlStateToInputs() {
+  if (!pendingUrlState) return;
+  const slider = document.getElementById('binSlider');
+  const binValue = document.getElementById('binValue');
+  const pctBox = document.getElementById('percentMode');
+  const hcMin = document.getElementById('hcMin');
+  const hcMax = document.getElementById('hcMax');
+
+  const parsedBins = parseInt(pendingUrlState.bins, 10);
+  if (!Number.isNaN(parsedBins)) {
+    const clamped = Math.max(parseInt(slider.min, 10), Math.min(parsedBins, parseInt(slider.max, 10)));
+    numBins = clamped;
+    slider.value = String(clamped);
+    binValue.textContent = String(clamped);
+  }
+
+  percentageMode = pendingUrlState.pct;
+  pctBox.checked = percentageMode;
+
+  if (pendingUrlState.min !== null) hcMin.value = pendingUrlState.min;
+  if (pendingUrlState.max !== null) hcMax.value = pendingUrlState.max;
+}
+
+function applyPendingUrlStateToData() {
+  if (!pendingUrlState) return;
+  isRestoringState = true;
+  const hcMin = document.getElementById('hcMin');
+  const hcMax = document.getElementById('hcMax');
+  if (pendingUrlState.min !== null) hcMin.value = pendingUrlState.min;
+  if (pendingUrlState.max !== null) hcMax.value = pendingUrlState.max;
+  if (Array.isArray(pendingUrlState.clubs) && pendingUrlState.clubs.length) {
+    selectedClubs = pendingUrlState.clubs.filter(club => CLUB_DATA[club]);
+  }
+  clampInputs();
+  updatePills();
+  isRestoringState = false;
+  pendingUrlState = null;
+}
+
 function applyNewData(clubData, timestamp) {
   Object.keys(CLUB_DATA).forEach(k => delete CLUB_DATA[k]);
   Object.assign(CLUB_DATA, clubData);
@@ -126,6 +240,7 @@ function applyNewData(clubData, timestamp) {
   selectedClubs.length = 0;
   pillArea.innerHTML = '';
   searchEl.value = '';
+  applyPendingUrlStateToData();
   refresh();
 }
 
@@ -377,6 +492,7 @@ function refresh() {
   const filtered = filterByRange(vals);
   renderChart(vals);
   updateStats(filtered);
+  syncActiveUrl();
 }
 
 function selectClub(club) {
@@ -428,6 +544,9 @@ function clampInputs() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  restoreStateFromUrl();
+  applyPendingUrlStateToInputs();
+
   const fi = document.getElementById('fileInput');
   fi.addEventListener('change', () => {
     handleFile(fi.files[0]);
@@ -465,6 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(id).textContent = '—';
     });
     noDataOverlay.style.display = 'flex';
+    syncActiveUrl();
   });
 
   helpBtn.addEventListener('click', () => {
@@ -483,6 +603,12 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchRemoteBtn.addEventListener('click', () => {
       noDataOverlay.style.display = 'none';
       fetchAndApplyRemoteData();
+    });
+  }
+
+  if (shareLinkBtn) {
+    shareLinkBtn.addEventListener('click', () => {
+      copyShareUrl();
     });
   }
 
