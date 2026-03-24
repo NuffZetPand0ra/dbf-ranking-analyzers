@@ -7,8 +7,20 @@ const CACHE_TS = 'dbf_hac_ts';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REMOTE_HAC_URL = '/api/hacalle';
 
-let currentClub = null;
+const CLUB_COLORS = [
+  'rgba(15, 118, 110, 0.72)',   // teal
+  'rgba(239, 68, 68, 0.72)',    // red
+  'rgba(59, 130, 246, 0.72)',   // blue
+  'rgba(16, 185, 129, 0.72)',   // emerald
+  'rgba(245, 158, 11, 0.72)',   // amber
+  'rgba(168, 85, 247, 0.72)',   // purple
+  'rgba(236, 72, 153, 0.72)',   // pink
+  'rgba(14, 165, 233, 0.72)'    // sky
+];
+
+let selectedClubs = [];
 let numBins = 62;
+let percentageMode = false;
 let chart = null;
 
 const searchEl = document.getElementById('clubSearch');
@@ -103,6 +115,16 @@ function applyNewData(clubData, timestamp) {
   CLUB_NAMES.push(...Object.keys(CLUB_DATA).sort((a, b) => a.localeCompare(b, 'da')));
   ALL_VALUES.length = 0;
   ALL_VALUES.push(...Object.values(CLUB_DATA).flat());
+
+  const hcMinInput = document.getElementById('hcMin');
+  const hcMaxInput = document.getElementById('hcMax');
+  const dataMinFloor = ALL_VALUES.length ? Math.floor(Math.min(...ALL_VALUES)) : -10;
+  hcMinInput.value = String(dataMinFloor);
+  if (!isNaN(parseFloat(hcMinInput.min)) && dataMinFloor < parseFloat(hcMinInput.min)) {
+    hcMinInput.min = String(dataMinFloor);
+    hcMaxInput.min = String(dataMinFloor);
+  }
+
   const total = ALL_VALUES.length;
   const nClubs = CLUB_NAMES.length;
   document.getElementById('headerDesc').innerHTML =
@@ -119,7 +141,7 @@ function applyNewData(clubData, timestamp) {
   }
 
   noDataOverlay.style.display = 'none';
-  currentClub = null;
+  selectedClubs.length = 0;
   pillArea.innerHTML = '';
   searchEl.value = '';
   refresh();
@@ -177,11 +199,12 @@ function updateStats(vals) {
 }
 
 function getHcRange() {
+  const lowerBound = ALL_VALUES.length ? Math.floor(Math.min(...ALL_VALUES)) : -10;
   const lo = parseFloat(document.getElementById('hcMin').value);
   const hi = parseFloat(document.getElementById('hcMax').value);
   return {
-    lo: isNaN(lo) ? -10 : Math.max(-10, Math.min(lo, 52)),
-    hi: isNaN(hi) ? 52 : Math.max(-10, Math.min(hi, 52))
+    lo: isNaN(lo) ? lowerBound : Math.max(lowerBound, Math.min(lo, 52)),
+    hi: isNaN(hi) ? 52 : Math.max(lowerBound, Math.min(hi, 52))
   };
 }
 
@@ -193,37 +216,88 @@ function filterByRange(vals) {
 function buildHist(vals, bins) {
   const { lo: mn, hi: mx } = getHcRange();
   const range = mx - mn;
-  if (range <= 0) return { labels: [], counts: [], w: 1 };
+  if (range <= 0) return { labels: [], datasets: [], w: 1 };
   const w = range / bins;
-  const counts = new Array(bins).fill(0);
   const labels = [];
   for (let i = 0; i < bins; i++) labels.push((mn + i * w).toFixed(2));
-  for (const v of vals) {
-    if (v < mn || v > mx) continue;
-    const idx = Math.min(Math.floor((v - mn) / w), bins - 1);
-    if (idx >= 0) counts[idx]++;
+  
+  // Build per-club datasets if multiple clubs selected
+  const datasets = [];
+  if (!selectedClubs.length) {
+    // All clubs: single combined dataset
+    const counts = new Array(bins).fill(0);
+    for (const v of vals) {
+      if (v < mn || v > mx) continue;
+      const idx = Math.min(Math.floor((v - mn) / w), bins - 1);
+      if (idx >= 0) counts[idx]++;
+    }
+    datasets.push({
+      label: 'Alle klubber',
+      data: counts,
+      color: 0
+    });
+  } else {
+    // Multiple selected clubs: separate dataset per club
+    for (let i = 0; i < selectedClubs.length; i++) {
+      const club = selectedClubs[i];
+      const clubVals = CLUB_DATA[club] || [];
+      const counts = new Array(bins).fill(0);
+      for (const v of clubVals) {
+        if (v < mn || v > mx) continue;
+        const idx = Math.min(Math.floor((v - mn) / w), bins - 1);
+        if (idx >= 0) counts[idx]++;
+      }
+      datasets.push({
+        label: club,
+        data: counts,
+        color: i % CLUB_COLORS.length
+      });
+    }
   }
-  return { labels, counts, w };
+  
+  return { labels, datasets, w };
 }
 
 function renderChart(vals) {
-  const { labels, counts, w } = buildHist(vals, numBins);
+  const { labels, datasets, w } = buildHist(vals, numBins);
   const ctx = document.getElementById('hChart').getContext('2d');
   if (chart) chart.destroy();
+  
+  // Convert to percentages if needed
+  let chartDatasets;
+  if (percentageMode) {
+    chartDatasets = datasets.map(ds => {
+      const total = ds.data.reduce((sum, count) => sum + count, 0);
+      const percentData = total > 0 ? ds.data.map(count => (count / total) * 100) : ds.data;
+      return {
+        label: ds.label,
+        data: percentData,
+        backgroundColor: CLUB_COLORS[ds.color],
+        hoverBackgroundColor: CLUB_COLORS[ds.color].replace('0.72', '0.92'),
+        borderColor: 'transparent',
+        borderRadius: 2,
+        barPercentage: selectedClubs.length > 1 ? 0.8 : 1.0,
+        categoryPercentage: selectedClubs.length > 1 ? 0.8 : 1.0
+      };
+    });
+  } else {
+    chartDatasets = datasets.map(ds => ({
+      label: ds.label,
+      data: ds.data,
+      backgroundColor: CLUB_COLORS[ds.color],
+      hoverBackgroundColor: CLUB_COLORS[ds.color].replace('0.72', '0.92'),
+      borderColor: 'transparent',
+      borderRadius: 2,
+      barPercentage: selectedClubs.length > 1 ? 0.8 : 1.0,
+      categoryPercentage: selectedClubs.length > 1 ? 0.8 : 1.0
+    }));
+  }
+  
   chart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{
-        label: 'Spillere',
-        data: counts,
-        backgroundColor: 'rgba(15, 118, 110, 0.72)',
-        hoverBackgroundColor: 'rgba(13, 148, 136, 0.92)',
-        borderColor: 'transparent',
-        borderRadius: 2,
-        barPercentage: 1.0,
-        categoryPercentage: 1.0
-      }]
+      datasets: chartDatasets
     },
     options: {
       responsive: true,
@@ -231,14 +305,19 @@ function renderChart(vals) {
       aspectRatio: 2.8,
       animation: { duration: 250 },
       plugins: {
-        legend: { display: false },
+        legend: { display: selectedClubs.length > 1, position: 'top' },
         tooltip: {
           callbacks: {
             title: (items) => {
               const lo = parseFloat(items[0].label);
               return 'HC ' + lo.toFixed(1).replace('.', ',') + '–' + (lo + w).toFixed(1).replace('.', ',');
             },
-            label: (item) => ' ' + item.raw + ' spillere'
+            label: (item) => {
+              if (percentageMode) {
+                return ' ' + item.raw.toFixed(1).replace('.', ',') + '%';
+              }
+              return ' ' + item.raw + ' spillere';
+            }
           },
           backgroundColor: 'rgba(255,255,255,.97)',
           borderColor: 'rgba(64,52,40,.22)',
@@ -268,7 +347,7 @@ function renderChart(vals) {
           ticks: { color: '#63584d', font: { family: 'IBM Plex Mono', size: 10 } },
           grid: { color: 'rgba(64,52,40,.16)' },
           border: { color: 'transparent', dash: [4, 4] },
-          title: { display: true, text: 'Antal spillere', color: '#63584d', font: { family: 'Manrope', size: 12 } }
+          title: { display: true, text: percentageMode ? 'Procent af klub' : 'Antal spillere', color: '#63584d', font: { family: 'Manrope', size: 12 } }
         }
       }
     }
@@ -280,7 +359,8 @@ function renderDropdown(q) {
   dropEl.innerHTML = '';
   const allDiv = document.createElement('div');
   allDiv.className = 'dropdown-item';
-  allDiv.innerHTML = '<span><strong>Alle klubber</strong></span><span class="count">' + ALL_VALUES.length.toLocaleString('da-DK') + '</span>';
+  const allChecked = selectedClubs.length === 0 ? '✓ ' : '';
+  allDiv.innerHTML = '<span><strong>' + allChecked + 'Alle klubber</strong></span><span class="count">' + ALL_VALUES.length.toLocaleString('da-DK') + '</span>';
   allDiv.addEventListener('mousedown', e => {
     e.preventDefault();
     selectClub(null);
@@ -289,7 +369,8 @@ function renderDropdown(q) {
   filt.slice(0, 100).forEach(club => {
     const d = document.createElement('div');
     d.className = 'dropdown-item';
-    d.innerHTML = '<span>' + club + '</span><span class="count">' + CLUB_DATA[club].length + '</span>';
+    const isSelected = selectedClubs.includes(club) ? '✓ ' : '';
+    d.innerHTML = '<span>' + isSelected + club + '</span><span class="count">' + CLUB_DATA[club].length + '</span>';
     d.addEventListener('mousedown', e => {
       e.preventDefault();
       selectClub(club);
@@ -300,7 +381,12 @@ function renderDropdown(q) {
 }
 
 function getCurrentVals() {
-  return currentClub ? CLUB_DATA[currentClub] : ALL_VALUES;
+  if (!selectedClubs.length) return ALL_VALUES;
+  const combined = [];
+  for (const club of selectedClubs) {
+    if (CLUB_DATA[club]) combined.push(...CLUB_DATA[club]);
+  }
+  return combined;
 }
 
 function refresh() {
@@ -312,21 +398,38 @@ function refresh() {
 }
 
 function selectClub(club) {
-  currentClub = club;
+  if (club === null) {
+    // Clear all selections
+    selectedClubs.length = 0;
+  } else if (selectedClubs.includes(club)) {
+    // Toggle off
+    selectedClubs.splice(selectedClubs.indexOf(club), 1);
+  } else {
+    // Toggle on
+    selectedClubs.push(club);
+  }
+  updatePills();
   dropEl.classList.remove('open');
   searchEl.value = '';
-  if (club) {
-    pillArea.innerHTML = '<div class="pill">' + club + '<button id="clearClubBtn" type="button">✕</button></div>';
-    const clearClubBtn = document.getElementById('clearClubBtn');
-    if (clearClubBtn) clearClubBtn.addEventListener('click', clearClub);
-  } else {
-    pillArea.innerHTML = '';
-  }
   refresh();
 }
 
-function clearClub() {
-  selectClub(null);
+function updatePills() {
+  pillArea.innerHTML = '';
+  if (!selectedClubs.length) return;
+  selectedClubs.forEach((club, idx) => {
+    const pill = document.createElement('div');
+    pill.className = 'pill';
+    pill.style.borderColor = CLUB_COLORS[idx % CLUB_COLORS.length].replace('0.72', '1');
+    pill.innerHTML = club + '<button class="clear-club-btn" type="button">✕</button>';
+    const btn = pill.querySelector('.clear-club-btn');
+    btn.addEventListener('click', () => {
+      selectedClubs.splice(idx, 1);
+      updatePills();
+      refresh();
+    });
+    pillArea.appendChild(pill);
+  });
 }
 
 function clampInputs() {
@@ -355,9 +458,16 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.keys(CLUB_DATA).forEach(k => delete CLUB_DATA[k]);
     CLUB_NAMES.length = 0;
     ALL_VALUES.length = 0;
+    selectedClubs.length = 0;
+    percentageMode = false;
+    document.getElementById('percentMode').checked = false;
     document.getElementById('headerDesc').innerHTML = 'Danmarks Bridgeforbund';
     document.getElementById('dataAge').textContent = '';
     document.getElementById('dataAge').className = 'data-age';
+    document.getElementById('hcMin').value = '-10';
+    document.getElementById('hcMax').value = '52';
+    document.getElementById('hcMin').min = '-10';
+    document.getElementById('hcMax').min = '-10';
     setFetchStatus('');
     pillArea.innerHTML = '';
     searchEl.value = '';
@@ -397,6 +507,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('binSlider').addEventListener('input', function() {
     numBins = parseInt(this.value);
     document.getElementById('binValue').textContent = numBins;
+    refresh();
+  });
+
+  document.getElementById('percentMode').addEventListener('change', function() {
+    percentageMode = this.checked;
     refresh();
   });
 
