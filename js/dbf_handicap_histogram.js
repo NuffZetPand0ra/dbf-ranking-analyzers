@@ -41,25 +41,6 @@ function setFetchStatus(msg, type) {
   if (type === 'err') fetchStatus.classList.add('stale');
 }
 
-function pickDecoder(contentType) {
-  const m = (contentType || '').match(/charset\s*=\s*([^;]+)/i);
-  let charset = m ? m[1].trim().toLowerCase() : 'windows-1252';
-  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252';
-  try {
-    return new TextDecoder(charset);
-  } catch (_) {
-    return new TextDecoder('windows-1252');
-  }
-}
-
-async function fetchHtmlText(url, signal) {
-  const res = await fetch(url, { signal, cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const decoder = pickDecoder(res.headers.get('content-type'));
-  const buf = await res.arrayBuffer();
-  return decoder.decode(buf);
-}
-
 async function fetchRemoteHacHtml(signal) {
   const html = await fetchHtmlText(REMOTE_HAC_URL, signal);
   return { html, source: 'backend' };
@@ -263,35 +244,21 @@ function renderChart(vals) {
   const ctx = document.getElementById('hChart').getContext('2d');
   if (chart) chart.destroy();
   
-  // Convert to percentages if needed
-  let chartDatasets;
-  if (percentageMode) {
-    chartDatasets = datasets.map(ds => {
-      const total = ds.data.reduce((sum, count) => sum + count, 0);
-      const percentData = total > 0 ? ds.data.map(count => (count / total) * 100) : ds.data;
-      return {
-        label: ds.label,
-        data: percentData,
-        backgroundColor: CLUB_COLORS[ds.color],
-        hoverBackgroundColor: CLUB_COLORS[ds.color].replace('0.72', '0.92'),
-        borderColor: 'transparent',
-        borderRadius: 2,
-        barPercentage: selectedClubs.length > 1 ? 0.8 : 1.0,
-        categoryPercentage: selectedClubs.length > 1 ? 0.8 : 1.0
-      };
-    });
-  } else {
-    chartDatasets = datasets.map(ds => ({
+  const multiClub = selectedClubs.length > 1;
+  const chartDatasets = datasets.map(ds => {
+    const total = ds.data.reduce((sum, count) => sum + count, 0);
+    const data = percentageMode && total > 0 ? ds.data.map(count => (count / total) * 100) : ds.data;
+    return {
       label: ds.label,
-      data: ds.data,
+      data,
       backgroundColor: CLUB_COLORS[ds.color],
       hoverBackgroundColor: CLUB_COLORS[ds.color].replace('0.72', '0.92'),
       borderColor: 'transparent',
       borderRadius: 2,
-      barPercentage: selectedClubs.length > 1 ? 0.8 : 1.0,
-      categoryPercentage: selectedClubs.length > 1 ? 0.8 : 1.0
-    }));
-  }
+      barPercentage: multiClub ? 0.8 : 1.0,
+      categoryPercentage: multiClub ? 0.8 : 1.0
+    };
+  });
   
   chart = new Chart(ctx, {
     type: 'bar',
@@ -369,8 +336,13 @@ function renderDropdown(q) {
   filt.slice(0, 100).forEach(club => {
     const d = document.createElement('div');
     d.className = 'dropdown-item';
-    const isSelected = selectedClubs.includes(club) ? '✓ ' : '';
-    d.innerHTML = '<span>' + isSelected + club + '</span><span class="count">' + CLUB_DATA[club].length + '</span>';
+    const nameSpan = document.createElement('span');
+    if (selectedClubs.includes(club)) nameSpan.appendChild(document.createTextNode('\u2713 '));
+    nameSpan.appendChild(document.createTextNode(club));
+    const countSpan = document.createElement('span');
+    countSpan.className = 'count';
+    countSpan.textContent = CLUB_DATA[club].length;
+    d.append(nameSpan, countSpan);
     d.addEventListener('mousedown', e => {
       e.preventDefault();
       selectClub(club);
@@ -421,13 +393,17 @@ function updatePills() {
     const pill = document.createElement('div');
     pill.className = 'pill';
     pill.style.borderColor = CLUB_COLORS[idx % CLUB_COLORS.length].replace('0.72', '1');
-    pill.innerHTML = club + '<button class="clear-club-btn" type="button">✕</button>';
-    const btn = pill.querySelector('.clear-club-btn');
+    pill.textContent = club;
+    const btn = document.createElement('button');
+    btn.className = 'clear-club-btn';
+    btn.type = 'button';
+    btn.textContent = '\u2715';
     btn.addEventListener('click', () => {
       selectedClubs.splice(idx, 1);
       updatePills();
       refresh();
     });
+    pill.appendChild(btn);
     pillArea.appendChild(pill);
   });
 }

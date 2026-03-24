@@ -13,6 +13,20 @@ const btnHover = document.getElementById('toggle-hover');
 const dbfNumberInput = document.getElementById('dbf-number');
 const fetchPlayerBtn = document.getElementById('fetch-player-btn');
 const fetchPlayerStatus = document.getElementById('fetch-player-status');
+const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+const granularityEl = document.getElementById('granularity');
+const fromDateEl = document.getElementById('from-date');
+const toDateEl = document.getElementById('to-date');
+const tensionEl = document.getElementById('tension');
+const emptyMsgEl = document.getElementById('empty-msg');
+const chartWrapEl = document.getElementById('chart-wrap');
+const legendEl = document.getElementById('legend');
+const statsRowEl = document.getElementById('stats-row');
+const myChartEl = document.getElementById('myChart');
+const pillRowEl = document.getElementById('pill-row');
+const fileInputEl = document.getElementById('file-input');
+const addBtnEl = document.getElementById('add-btn');
+const datePresetSelect = document.getElementById('date-preset');
 
 function setFetchPlayerStatus(msg, type) {
   if (!fetchPlayerStatus) return;
@@ -20,17 +34,6 @@ function setFetchPlayerStatus(msg, type) {
   fetchPlayerStatus.className = 'fetch-status';
   if (type === 'ok') fetchPlayerStatus.classList.add('ok');
   if (type === 'err') fetchPlayerStatus.classList.add('err');
-}
-
-function pickDecoder(contentType) {
-  const m = (contentType || '').match(/charset\s*=\s*([^;]+)/i);
-  let charset = m ? m[1].trim().toLowerCase() : 'windows-1252';
-  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252';
-  try {
-    return new TextDecoder(charset);
-  } catch (_) {
-    return new TextDecoder('windows-1252');
-  }
 }
 
 function normalizeDbfNr(value) {
@@ -61,14 +64,6 @@ function writeLookupCache(dbfNr, html, source) {
   try {
     localStorage.setItem(key, JSON.stringify({ ts: Date.now(), source, html }));
   } catch (_) {}
-}
-
-async function fetchHtmlText(url) {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const decoder = pickDecoder(res.headers.get('content-type'));
-  const buf = await res.arrayBuffer();
-  return decoder.decode(buf);
 }
 
 async function fetchLookupHtml(dbfNr) {
@@ -146,7 +141,7 @@ if (btnHover) {
 
 function pointRadius() {
   if (!showPoints) return 0;
-  return document.getElementById('granularity').value === 'all' ? 1.5 : 3;
+  return granularityEl.value === 'all' ? 1.5 : 3;
 }
 
 function updatePointStyles() {
@@ -165,9 +160,9 @@ function updatePointStyles() {
   chart.update();
 }
 
-document.getElementById('add-btn').addEventListener('click', () => document.getElementById('file-input').click());
+addBtnEl.addEventListener('click', () => fileInputEl.click());
 
-document.getElementById('file-input').addEventListener('change', function(e) {
+fileInputEl.addEventListener('change', function(e) {
   const files = Array.from(e.target.files);
   if (!files.length) return;
   let loaded = 0;
@@ -250,12 +245,12 @@ function bucketLabel(key, gran) {
 }
 
 function getFrom() {
-  const v = document.getElementById('from-date').value;
+  const v = fromDateEl.value;
   return v ? new Date(v) : null;
 }
 
 function getTo() {
-  const v = document.getElementById('to-date').value;
+  const v = toDateEl.value;
   if (!v) return null;
   const d = new Date(v);
   d.setHours(23, 59, 59);
@@ -265,7 +260,7 @@ function getTo() {
 function allKeys() {
   const f = getFrom();
   const t = getTo();
-  const g = document.getElementById('granularity').value;
+  const g = granularityEl.value;
   const s = new Set();
   for (const p of players) {
     for (const e of p.entries) {
@@ -303,15 +298,22 @@ function updateDateRange() {
       if (!mx || e.date > mx) mx = e.date;
     }
   }
-  const fd = document.getElementById('from-date');
-  const td = document.getElementById('to-date');
-  if (mn && !fd.value) fd.value = mn.toISOString().slice(0, 10);
-  if (mx && !td.value) td.value = mx.toISOString().slice(0, 10);
+  if (mn && !fromDateEl.value) fromDateEl.value = mn.toISOString().slice(0, 10);
+  if (mx && !toDateEl.value) toDateEl.value = mx.toISOString().slice(0, 10);
+}
+
+function togglePlayerVisibility(i) {
+  if (hiddenPlayers.has(i)) {
+    hiddenPlayers.delete(i);
+  } else {
+    hiddenPlayers.add(i);
+  }
+  rebuildPills();
+  render();
 }
 
 function rebuildPills() {
-  const row = document.getElementById('pill-row');
-  row.innerHTML = '';
+  pillRowEl.innerHTML = '';
   players.forEach((p, i) => {
     const pill = document.createElement('span');
     pill.className = 'pill';
@@ -320,96 +322,91 @@ function rebuildPills() {
     pill.style.opacity = isHidden ? '0.4' : '1';
     pill.style.cursor = 'pointer';
     pill.style.transition = 'opacity 0.2s';
-    
+
     const dot = document.createElement('span');
     dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${COLORS[i % COLORS.length]};display:inline-block`;
-    
+
     const txt = document.createElement('span');
     txt.textContent = p.dbfNr ? `${p.name} (#${p.dbfNr})` : p.name;
-    
+
     const btn = document.createElement('button');
     btn.textContent = '×';
     btn.title = 'Fjern';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       players.splice(i, 1);
-      hiddenPlayers.delete(i);
-      for (let idx of hiddenPlayers) {
-        if (idx > i) {
-          hiddenPlayers.delete(idx);
-          hiddenPlayers.add(idx - 1);
-        }
+      const shifted = new Set();
+      for (const idx of hiddenPlayers) {
+        if (idx === i) continue;
+        shifted.add(idx > i ? idx - 1 : idx);
       }
+      hiddenPlayers.clear();
+      for (const idx of shifted) hiddenPlayers.add(idx);
       rebuildPills();
       render();
     });
-    
-    const toggleVisibility = () => {
-      if (hiddenPlayers.has(i)) {
-        hiddenPlayers.delete(i);
-      } else {
-        hiddenPlayers.add(i);
-      }
-      rebuildPills();
-      render();
-    };
-    
+
     pill.append(dot, txt, btn);
-    pill.addEventListener('click', toggleVisibility);
-    row.appendChild(pill);
+    pill.addEventListener('click', () => togglePlayerVisibility(i));
+    pillRowEl.appendChild(pill);
   });
   const ab = document.createElement('span');
   ab.className = 'add-btn';
   ab.textContent = '+ Tilføj spiller';
-  ab.addEventListener('click', () => document.getElementById('file-input').click());
-  row.appendChild(ab);
+  ab.addEventListener('click', () => fileInputEl.click());
+  pillRowEl.appendChild(ab);
 }
 
 function render() {
-  const gran = document.getElementById('granularity').value;
-  const tension = parseFloat(document.getElementById('tension').value);
+  const gran = granularityEl.value;
+  const tension = parseFloat(tensionEl.value);
   const labels = allKeys();
   const r = pointRadius();
 
-  document.getElementById('empty-msg').style.display = players.length ? 'none' : '';
-  document.getElementById('chart-wrap').style.display = players.length ? '' : 'none';
+  emptyMsgEl.style.display = players.length ? 'none' : '';
+  chartWrapEl.style.display = players.length ? '' : 'none';
   
   const visiblePlayers = players.map((p, i) => ({ p, i })).filter(({ i }) => !hiddenPlayers.has(i));
   
-  const legendDiv = document.getElementById('legend');
-  legendDiv.innerHTML = '';
+  legendEl.innerHTML = '';
   players.forEach((p, i) => {
     const span = document.createElement('span');
     span.className = 'legend-item';
     const isHidden = hiddenPlayers.has(i);
     span.style.opacity = isHidden ? '0.4' : '1';
     span.style.cursor = 'pointer';
-    
+
     const dot = document.createElement('span');
     dot.style.cssText = `width:10px;height:10px;border-radius:2px;background:${COLORS[i % COLORS.length]};display:inline-block`;
     const label = document.createElement('span');
     label.textContent = p.name;
-    
+
     span.append(dot, label);
-    span.addEventListener('click', () => {
-      if (hiddenPlayers.has(i)) {
-        hiddenPlayers.delete(i);
-      } else {
-        hiddenPlayers.add(i);
-      }
-      rebuildPills();
-      render();
-    });
-    legendDiv.appendChild(span);
+    span.addEventListener('click', () => togglePlayerVisibility(i));
+    legendEl.appendChild(span);
   });
-  document.getElementById('stats-row').innerHTML = visiblePlayers.map(({ p, i }) => {
-    const f = getFrom();
-    const t = getTo();
+  statsRowEl.innerHTML = '';
+  const f = getFrom();
+  const t = getTo();
+  for (const { p, i } of visiblePlayers) {
     const fe = p.entries.filter(e => (!f || e.date >= f) && (!t || e.date <= t));
     const last = fe.length ? fe[fe.length - 1].hc.toFixed(2) : '–';
     const best = fe.length ? Math.min(...fe.map(e => e.hc)).toFixed(2) : '–';
-    return `<div class="stat-card" style="border-left:3px solid ${COLORS[i % COLORS.length]}"><div class="stat-label">${p.name}</div><div class="stat-val">${last}</div><div class="stat-sub">Bedste: ${best}</div></div>`;
-  }).join('');
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.style.borderLeft = `3px solid ${COLORS[i % COLORS.length]}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'stat-label';
+    lbl.textContent = p.name;
+    const val = document.createElement('div');
+    val.className = 'stat-val';
+    val.textContent = last;
+    const sub = document.createElement('div');
+    sub.className = 'stat-sub';
+    sub.textContent = 'Bedste: ' + best;
+    card.append(lbl, val, sub);
+    statsRowEl.appendChild(card);
+  }
 
   if (!players.length) {
     if (chart) {
@@ -440,7 +437,7 @@ function render() {
     chart.options.plugins.tooltip.enabled = showHover;
     chart.update();
   } else {
-    chart = new Chart(document.getElementById('myChart'), {
+    chart = new Chart(myChartEl, {
       type: 'line',
       data: { labels: cl, datasets },
       options: {
@@ -473,21 +470,18 @@ function render() {
   }
 }
 
-['from-date', 'to-date', 'granularity'].forEach(id => document.getElementById(id).addEventListener('change', render));
-document.getElementById('tension').addEventListener('input', render);
+[fromDateEl, toDateEl, granularityEl].forEach(el => el.addEventListener('change', render));
+tensionEl.addEventListener('input', render);
 
-const datePresetSelect = document.getElementById('date-preset');
 if (datePresetSelect) {
   datePresetSelect.addEventListener('change', () => {
     const months = parseInt(datePresetSelect.value, 10);
     if (isNaN(months)) return;
-    
+
     const today = new Date();
     const from = new Date(today);
     from.setMonth(from.getMonth() - months);
-    
-    const fromDateEl = document.getElementById('from-date');
-    const toDateEl = document.getElementById('to-date');
+
     fromDateEl.value = from.toISOString().slice(0, 10);
     toDateEl.value = today.toISOString().slice(0, 10);
     datePresetSelect.value = '';
@@ -496,7 +490,6 @@ if (datePresetSelect) {
 }
 
 let allPlayersCache = null;
-const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
 
 async function fetchAllPlayers() {
   if (allPlayersCache) return allPlayersCache;
@@ -533,12 +526,20 @@ function showAutocomplete(matches) {
     autocompleteDropdown.style.display = 'none';
     return;
   }
-  autocompleteDropdown.innerHTML = matches.slice(0, 10).map(p =>
-    `<div class="autocomplete-item" data-dbf="${p.dbfNr}">
-      <div class="autocomplete-item-name">${p.name}</div>
-      <div class="autocomplete-item-club">${p.club} (${p.dbfNr})</div>
-    </div>`
-  ).join('');
+  autocompleteDropdown.innerHTML = '';
+  for (const p of matches.slice(0, 10)) {
+    const item = document.createElement('div');
+    item.className = 'autocomplete-item';
+    item.dataset.dbf = p.dbfNr;
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'autocomplete-item-name';
+    nameDiv.textContent = p.name;
+    const clubDiv = document.createElement('div');
+    clubDiv.className = 'autocomplete-item-club';
+    clubDiv.textContent = `${p.club} (${p.dbfNr})`;
+    item.append(nameDiv, clubDiv);
+    autocompleteDropdown.appendChild(item);
+  }
   autocompleteDropdown.style.display = 'block';
 }
 
