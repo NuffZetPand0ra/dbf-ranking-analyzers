@@ -573,7 +573,7 @@ function clearClientCaches() {
 function buildStateParams(includeEndDate) {
   const params = new URLSearchParams();
   const dbfPlayers = players.map(p => p.dbfNr).filter(Boolean);
-  if (dbfPlayers.length) params.set('p', dbfPlayers.join(','));
+  if (dbfPlayers.length) params.set('p', dbfPlayers.join('-'));
   if (fromDateEl.value) params.set('from', fromDateEl.value);
   if (includeEndDate && toDateEl.value) params.set('to', toDateEl.value);
 
@@ -585,7 +585,7 @@ function buildStateParams(includeEndDate) {
   const hiddenDbf = players
     .map((p, i) => (hiddenPlayers.has(i) ? p.dbfNr : null))
     .filter(Boolean);
-  if (hiddenDbf.length) params.set('h', hiddenDbf.join(','));
+  if (hiddenDbf.length) params.set('h', hiddenDbf.join('-'));
   return params;
 }
 
@@ -666,7 +666,7 @@ async function restoreStateFromUrl() {
     if (btnPoints) btnPoints.classList.toggle('on', showPoints);
     if (btnHover) btnHover.classList.toggle('on', showHover);
 
-    const p = (params.get('p') || '').split(',').map(normalizeDbfNr).filter(Boolean);
+    const p = (params.get('p') || '').split('-').map(normalizeDbfNr).filter(Boolean);
     if (p.length) {
       for (const dbfNr of p) {
         try {
@@ -675,7 +675,7 @@ async function restoreStateFromUrl() {
       }
     }
 
-    const hidden = new Set((params.get('h') || '').split(',').map(normalizeDbfNr).filter(Boolean));
+    const hidden = new Set((params.get('h') || '').split('-').map(normalizeDbfNr).filter(Boolean));
     hiddenPlayers.clear();
     players.forEach((player, idx) => {
       if (player.dbfNr && hidden.has(player.dbfNr)) hiddenPlayers.add(idx);
