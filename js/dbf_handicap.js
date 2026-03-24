@@ -827,6 +827,10 @@ if (includeEndDateEl) {
 }
 
 // Pre-fetch player list on load for autocomplete
+if (includeEndDateEl) {
+  includeEndDateEl.checked = new URLSearchParams(window.location.search).has('to');
+}
+
 restoreStateFromUrl().finally(() => {
   fetchAllPlayers();
 });
