@@ -35,6 +35,7 @@ const closeOverlayBtn = document.getElementById('closeOverlay');
 const uploadBtnBig = document.getElementById('uploadBtnBig');
 const fetchRemoteBtn = document.getElementById('fetchRemoteBtn');
 const shareLinkBtn = document.getElementById('shareLinkBtn');
+const exportChartBtn = document.getElementById('exportChartBtn');
 const fetchStatus = document.getElementById('fetchStatus');
 
 function setFetchStatus(msg, type) {
@@ -150,6 +151,40 @@ async function copyShareUrl() {
   } catch (_) {
     setFetchStatus('Kunne ikke kopiere link', 'err');
     flashShareButton('Fejl');
+  }
+}
+
+function exportChart() {
+  if (!chart) {
+    alert('Diagrammet er ikke klar endnu');
+    return;
+  }
+
+  const flashExportButton = (label) => {
+    if (!exportChartBtn) return;
+    const old = exportChartBtn.textContent;
+    exportChartBtn.textContent = label;
+    exportChartBtn.style.pointerEvents = 'none';
+    setTimeout(() => {
+      exportChartBtn.textContent = old;
+      exportChartBtn.style.pointerEvents = '';
+    }, 1200);
+  };
+
+  try {
+    const imageData = chart.toBase64Image();
+    const link = document.createElement('a');
+    link.href = imageData;
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    link.download = `handicap-diagram-${dateStr}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    flashExportButton('Gemt');
+  } catch (err) {
+    console.error('Export failed:', err);
+    flashExportButton('Fejl');
   }
 }
 
@@ -609,6 +644,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (shareLinkBtn) {
     shareLinkBtn.addEventListener('click', () => {
       copyShareUrl();
+    });
+  }
+
+  if (exportChartBtn) {
+    exportChartBtn.addEventListener('click', () => {
+      exportChart();
     });
   }
 

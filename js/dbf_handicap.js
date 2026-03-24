@@ -31,6 +31,7 @@ const fileInputEl = document.getElementById('file-input');
 const addBtnEl = document.getElementById('add-btn');
 const datePresetSelect = document.getElementById('date-preset');
 const shareLinkBtn = document.getElementById('share-link-btn');
+const exportChartBtn = document.getElementById('export-chart-btn');
 const includeEndDateEl = document.getElementById('include-end-date');
 
 let isRestoringState = false;
@@ -641,6 +642,40 @@ async function copyShareUrl() {
   }
 }
 
+function exportChart() {
+  if (!chart) {
+    alert('Diagrammet er ikke klar endnu');
+    return;
+  }
+
+  const flashExportButton = (label) => {
+    if (!exportChartBtn) return;
+    const old = exportChartBtn.textContent;
+    exportChartBtn.textContent = label;
+    exportChartBtn.style.pointerEvents = 'none';
+    setTimeout(() => {
+      exportChartBtn.textContent = old;
+      exportChartBtn.style.pointerEvents = '';
+    }, 1200);
+  };
+
+  try {
+    const imageData = chart.toBase64Image();
+    const link = document.createElement('a');
+    link.href = imageData;
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    link.download = `handicap-trend-${dateStr}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    flashExportButton('Gemt');
+  } catch (err) {
+    console.error('Export failed:', err);
+    flashExportButton('Fejl');
+  }
+}
+
 async function restoreStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
   if (!params.toString()) return;
@@ -844,6 +879,12 @@ if (clearPlayerCacheBtn) {
 if (shareLinkBtn) {
   shareLinkBtn.addEventListener('click', () => {
     copyShareUrl();
+  });
+}
+
+if (exportChartBtn) {
+  exportChartBtn.addEventListener('click', () => {
+    exportChart();
   });
 }
 
