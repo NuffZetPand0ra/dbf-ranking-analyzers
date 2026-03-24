@@ -1,0 +1,14 @@
+{
+  "name": "dbf-ranking-analyzers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static analyzers for DBF handicap views",
+  "scripts": {
+    "dev": "live-server --port=4173 --open=dbf_handicap.html",
+    "dev:histogram": "live-server --port=4174 --open=dbf_handicap_histogram.html",
+    "preview": "live-server --port=4173 --no-browser"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
