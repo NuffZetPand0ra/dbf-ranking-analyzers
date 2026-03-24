@@ -2,7 +2,27 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Dark mode is the default */
 :root {
+  --bg-1: #131110;
+  --bg-2: #1c1916;
+  --surface: rgba(32, 28, 24, 0.88);
+  --surface-solid: #201c18;
+  --surface-muted: #252019;
+  --border: rgba(255, 225, 185, 0.12);
+  --text: #ede5d8;
+  --muted: #998a7a;
+  --accent: #14b8a6;
+  --accent-strong: #2dd4bf;
+  --danger: #e05a3a;
+  --shadow: 0 20px 42px rgba(0, 0, 0, 0.52);
+  --fresh: #22c55e;
+  --overlay-bg: rgba(10, 9, 8, 0.88);
+  --tint-teal: rgba(20, 184, 166, 0.14);
+  --tint-rust: rgba(224, 90, 58, 0.10);
+}
+
+[data-theme="light"] {
   --bg-1: #f6efe5;
   --bg-2: #e8dece;
   --surface: rgba(255, 255, 255, 0.78);
@@ -15,6 +35,10 @@
   --accent-strong: #0d9488;
   --danger: #b93822;
   --shadow: 0 20px 42px rgba(42, 30, 19, 0.14);
+  --fresh: #14845f;
+  --overlay-bg: rgba(246, 239, 229, 0.92);
+  --tint-teal: rgba(13, 148, 136, 0.16);
+  --tint-rust: rgba(185, 56, 34, 0.12);
 }
 
 body {
@@ -22,8 +46,8 @@ body {
   color: var(--text);
   font-family: 'Manrope', sans-serif;
   background:
-    radial-gradient(900px 540px at 90% -10%, rgba(13, 148, 136, 0.16), transparent 58%),
-    radial-gradient(840px 520px at -12% 102%, rgba(185, 56, 34, 0.12), transparent 64%),
+    radial-gradient(900px 540px at 90% -10%, var(--tint-teal), transparent 58%),
+    radial-gradient(840px 520px at -12% 102%, var(--tint-rust), transparent 64%),
     linear-gradient(160deg, var(--bg-1), var(--bg-2));
   padding: 1.1rem;
 }
@@ -153,6 +177,29 @@ select {
 .stat-card .value {
   color: var(--text);
   font-weight: 700;
+}
+
+.theme-toggle {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 999;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  background: var(--surface-solid);
+  color: var(--muted);
+  padding: 0.38rem 0.64rem;
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 @media (max-width: 900px) {

@@ -124,20 +124,24 @@ async function addPlayerFromDbfNumber() {
   }
 }
 
-btnPoints.addEventListener('click', () => {
-  showPoints = !showPoints;
-  btnPoints.classList.toggle('on', showPoints);
-  updatePointStyles();
-});
+if (btnPoints) {
+  btnPoints.addEventListener('click', () => {
+    showPoints = !showPoints;
+    btnPoints.classList.toggle('on', showPoints);
+    updatePointStyles();
+  });
+}
 
-btnHover.addEventListener('click', () => {
-  showHover = !showHover;
-  btnHover.classList.toggle('on', showHover);
-  if (chart) {
-    chart.options.plugins.tooltip.enabled = showHover;
-    chart.update('none');
-  }
-});
+if (btnHover) {
+  btnHover.addEventListener('click', () => {
+    showHover = !showHover;
+    btnHover.classList.toggle('on', showHover);
+    if (chart) {
+      chart.options.plugins.tooltip.enabled = showHover;
+      chart.update('none');
+    }
+  });
+}
 
 function pointRadius() {
   if (!showPoints) return 0;
@@ -147,11 +151,17 @@ function pointRadius() {
 function updatePointStyles() {
   if (!chart) return;
   const r = pointRadius();
+  if (!chart.options.elements) chart.options.elements = {};
+  if (!chart.options.elements.point) chart.options.elements.point = {};
+  chart.options.elements.point.radius = r;
+  chart.options.elements.point.hoverRadius = showPoints ? 5 : 0;
+  chart.options.elements.point.hitRadius = showPoints ? 6 : 0;
   chart.data.datasets.forEach(ds => {
     ds.pointRadius = r;
     ds.pointHoverRadius = showPoints ? 5 : 0;
+    ds.pointHitRadius = showPoints ? 6 : 0;
   });
-  chart.update('none');
+  chart.update();
 }
 
 document.getElementById('add-btn').addEventListener('click', () => document.getElementById('file-input').click());
@@ -363,6 +373,7 @@ function render() {
     borderWidth: 2,
     pointRadius: r,
     pointHoverRadius: showPoints ? 5 : 0,
+    pointHitRadius: showPoints ? 6 : 0,
     tension,
     fill: false,
     spanGaps: true

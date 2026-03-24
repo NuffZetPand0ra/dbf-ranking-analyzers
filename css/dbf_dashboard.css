@@ -82,7 +82,7 @@ iframe {
   height: 100%;
   min-height: 70vh;
   border: 0;
-  background: #fff;
+  background: var(--surface-solid);
 }
 
 @media (max-width: 1180px) {
