@@ -7,12 +7,15 @@ let showHover = true;
 const LOOKUP_BASE_URL = '/api/lookup';
 const LOOKUP_CACHE_PREFIX = 'dbf_lookup_';
 const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const ALL_PLAYERS_CACHE_KEY = 'dbf_all_players_cache_v1';
+const ALL_PLAYERS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 const btnPoints = document.getElementById('toggle-points');
 const btnHover = document.getElementById('toggle-hover');
 const dbfNumberInput = document.getElementById('dbf-number');
 const fetchPlayerBtn = document.getElementById('fetch-player-btn');
 const fetchPlayerStatus = document.getElementById('fetch-player-status');
+const clearPlayerCacheBtn = document.getElementById('clear-player-cache-btn');
 const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
 const granularityEl = document.getElementById('granularity');
 const fromDateEl = document.getElementById('from-date');
@@ -491,12 +494,56 @@ if (datePresetSelect) {
 
 let allPlayersCache = null;
 
+function playerMatchesQuery(p, query) {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = (p.name + ' ' + p.club).toLowerCase().replace(/\s+/g, ' ');
+  return words.every(w => haystack.includes(w));
+}
+
+function readAllPlayersCache() {
+  try {
+    const raw = localStorage.getItem(ALL_PLAYERS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || !Array.isArray(parsed.players)) return null;
+    if (Date.now() - parsed.ts > ALL_PLAYERS_CACHE_MAX_AGE_MS) return null;
+    return parsed.players;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeAllPlayersCache(playersList) {
+  try {
+    localStorage.setItem(ALL_PLAYERS_CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      players: playersList
+    }));
+  } catch (_) {}
+}
+
+function clearClientCaches() {
+  allPlayersCache = null;
+  try {
+    localStorage.removeItem(ALL_PLAYERS_CACHE_KEY);
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(LOOKUP_CACHE_PREFIX)) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+}
+
 async function fetchAllPlayers() {
   if (allPlayersCache) return allPlayersCache;
+  const cachedPlayers = readAllPlayersCache();
+  if (cachedPlayers) {
+    allPlayersCache = cachedPlayers;
+    return cachedPlayers;
+  }
   try {
-    const res = await fetch('/api/hacalle');
-    if (!res.ok) throw new Error('Failed to fetch player list');
-    const html = await res.text();
+    const html = await fetchHtmlText('/api/hacalle');
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const players = [];
     for (const row of doc.querySelectorAll('tr.MasterPointEqualRow, tr.MasterPointOddRow')) {
@@ -508,12 +555,13 @@ async function fetchAllPlayers() {
       const hrefMatch = (playerLink.getAttribute('href') || '').match(/DBFNr=(\d+)/i);
       if (!hrefMatch) continue;
       players.push({
-        name: playerLink.textContent.trim(),
-        club: clubLink ? clubLink.textContent.trim() : '',
+        name: playerLink.textContent.trim().replace(/\s+/g, ' '),
+        club: clubLink ? clubLink.textContent.trim().replace(/\s+/g, ' ') : '',
         dbfNr: hrefMatch[1]
       });
     }
     allPlayersCache = players;
+    writeAllPlayersCache(players);
     return players;
   } catch (err) {
     console.error('Error fetching player list:', err);
@@ -521,7 +569,10 @@ async function fetchAllPlayers() {
   }
 }
 
+let autocompleteIndex = -1;
+
 function showAutocomplete(matches) {
+  autocompleteIndex = -1;
   if (!matches.length) {
     autocompleteDropdown.style.display = 'none';
     return;
@@ -546,13 +597,11 @@ function showAutocomplete(matches) {
 if (dbfNumberInput) {
   // Show dropdown on input focus if there's any cached data
   dbfNumberInput.addEventListener('focus', async () => {
+    dbfNumberInput.select();
     const query = dbfNumberInput.value.trim();
     if (query.length > 0) {
       const allPlayers = await fetchAllPlayers();
-      const matches = allPlayers.filter(p =>
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        p.club.toLowerCase().includes(query.toLowerCase())
-      );
+      const matches = allPlayers.filter(p => playerMatchesQuery(p, query));
       showAutocomplete(matches);
     }
   });
@@ -565,10 +614,7 @@ if (dbfNumberInput) {
       return;
     }
     const allPlayers = await fetchAllPlayers();
-    const matches = allPlayers.filter(p =>
-      p.name.toLowerCase().includes(query.toLowerCase()) ||
-      p.club.toLowerCase().includes(query.toLowerCase())
-    );
+    const matches = allPlayers.filter(p => playerMatchesQuery(p, query));
     showAutocomplete(matches);
   });
 
@@ -576,6 +622,7 @@ if (dbfNumberInput) {
   dbfNumberInput.addEventListener('blur', () => {
     setTimeout(() => {
       autocompleteDropdown.style.display = 'none';
+      autocompleteIndex = -1;
     }, 150);
   });
 
@@ -586,21 +633,57 @@ if (dbfNumberInput) {
       const dbfNr = item.dataset.dbf;
       dbfNumberInput.value = dbfNr;
       autocompleteDropdown.style.display = 'none';
+      autocompleteIndex = -1;
       addPlayerFromDbfNumber();
     }
   });
 
-  // Enter key
+  // Keyboard navigation
   dbfNumberInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
+    const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
+    const isOpen = autocompleteDropdown.style.display !== 'none' && items.length > 0;
+
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
-      addPlayerFromDbfNumber();
+      if (!isOpen) return;
+      autocompleteIndex = Math.min(autocompleteIndex + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('autocomplete-item-active', i === autocompleteIndex));
+      items[autocompleteIndex]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) return;
+      autocompleteIndex = Math.max(autocompleteIndex - 1, 0);
+      items.forEach((el, i) => el.classList.toggle('autocomplete-item-active', i === autocompleteIndex));
+      items[autocompleteIndex]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isOpen && autocompleteIndex >= 0) {
+        const selected = items[autocompleteIndex];
+        dbfNumberInput.value = selected.dataset.dbf;
+        autocompleteDropdown.style.display = 'none';
+        autocompleteIndex = -1;
+        addPlayerFromDbfNumber();
+      } else {
+        addPlayerFromDbfNumber();
+      }
+    } else if (e.key === 'Escape') {
+      autocompleteDropdown.style.display = 'none';
+      autocompleteIndex = -1;
     }
   });
 }
 
 if (fetchPlayerBtn) {
   fetchPlayerBtn.addEventListener('click', addPlayerFromDbfNumber);
+}
+
+if (clearPlayerCacheBtn) {
+  clearPlayerCacheBtn.addEventListener('click', () => {
+    clearClientCaches();
+    autocompleteDropdown.style.display = 'none';
+    setFetchPlayerStatus('Lokal cache ryddet', 'ok');
+    fetchAllPlayers();
+  });
 }
 
 // Pre-fetch player list on load for autocomplete

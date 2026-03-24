@@ -11,6 +11,9 @@ const DEFAULT_PAGE = process.env.OPEN_PAGE || 'dbf_dashboard.html';
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
+const HACALLE_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+let hacalleCache = null;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -102,6 +105,15 @@ async function relayRemote(res, remoteUrl) {
   }
 }
 
+function sendHtmlBuffer(res, buffer, contentType, extraHeaders) {
+  res.writeHead(200, {
+    'Content-Type': contentType || 'text/html; charset=windows-1252',
+    'Cache-Control': 'no-store',
+    ...extraHeaders
+  });
+  res.end(buffer);
+}
+
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
 
@@ -111,7 +123,50 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (reqUrl.pathname === '/api/hacalle') {
-    await relayRemote(res, HACALLE_URL);
+    const now = Date.now();
+    const forceRefresh = reqUrl.searchParams.get('refresh') === '1';
+    const isFresh = hacalleCache && now - hacalleCache.ts <= HACALLE_CACHE_MAX_AGE_MS;
+
+    if (!forceRefresh && isFresh) {
+      sendHtmlBuffer(res, hacalleCache.buffer, hacalleCache.contentType, {
+        'X-Relay-Source': HACALLE_URL,
+        'X-Relay-Cache': 'HIT'
+      });
+      return;
+    }
+
+    try {
+      const upstream = await fetch(HACALLE_URL, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'dbf-ranking-analyzers/1.0 relay'
+        }
+      });
+
+      if (!upstream.ok) {
+        sendJson(res, 502, {
+          error: 'Upstream fetch failed',
+          status: upstream.status,
+          remoteUrl: HACALLE_URL
+        });
+        return;
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const contentType = upstream.headers.get('content-type') || 'text/html; charset=windows-1252';
+      hacalleCache = { ts: now, buffer, contentType };
+
+      sendHtmlBuffer(res, buffer, contentType, {
+        'X-Relay-Source': HACALLE_URL,
+        'X-Relay-Cache': 'MISS'
+      });
+    } catch (err) {
+      sendJson(res, 502, {
+        error: 'Relay request failed',
+        message: err.message,
+        remoteUrl: HACALLE_URL
+      });
+    }
     return;
   }
 
