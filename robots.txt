@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://your-domain.com/sitemap.xml
+Disallow: /sample_html/
+Disallow: /.well-known/security.txt
+
+# Crawlers should not index internal files
+Disallow: /server.js
+Disallow: /node_modules/
+Disallow: /package.json

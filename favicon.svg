@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Bridge analytics favicon">
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  
+  <path d="M16 46H48" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+  <path d="M16 46V18" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+
+  <path
+    d="M18 40 L27 34 L35 36 L46 22"
+    fill="none"
+    stroke="#38bdf8"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <circle cx="18" cy="40" r="2.5" fill="#38bdf8"/>
+  <circle cx="27" cy="34" r="2.5" fill="#38bdf8"/>
+  <circle cx="35" cy="36" r="2.5" fill="#38bdf8"/>
+  <circle cx="46" cy="22" r="2.5" fill="#38bdf8"/>
+
+  <text
+    x="32"
+    y="29"
+    text-anchor="middle"
+    font-size="18"
+    font-family="Georgia, serif"
+    fill="#ffffff"
+  >♠</text>
+</svg>
