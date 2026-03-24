@@ -2,6 +2,8 @@ header { margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bo
 header h1 { font-size: clamp(1.05rem, 1.6vw, 1.25rem); font-weight: 800; letter-spacing: -0.01em; }
 header p { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; margin-top: 0.26rem; }
 
+.page { max-width: min(96vw, 1800px); }
+
 .controls { display: flex; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 1.1rem; align-items: flex-end; }
 .control-group { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 200px; }
 .control-group label { font-size: 0.67rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -39,8 +41,18 @@ header p { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-si
 .stat-card .value { font-size: 1.05rem; font-family: 'IBM Plex Mono', monospace; }
 .stat-card .value.neg { color: var(--danger); }
 
-.chart-wrapper { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
-canvas { display: block; }
+.chart-wrapper {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  min-height: clamp(280px, 46vh, 560px);
+}
+#hChart {
+  display: block;
+  width: 100% !important;
+  height: clamp(260px, 42vh, 520px) !important;
+}
 
 .pill { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(13, 148, 136, 0.11); border: 1px solid rgba(13, 148, 136, 0.42); border-radius: 20px; padding: 0.3rem 0.8rem; font-size: 0.85rem; color: var(--accent); margin-top: 0.4rem; }
 .pill button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
@@ -107,6 +119,65 @@ canvas { display: block; }
 #closeOverlay:hover { color: var(--text); }
 
 @media (max-width: 860px) {
-  .control-group { min-width: 100%; }
-  .chart-wrapper { padding: 0.72rem; }
+  .controls {
+    gap: 0.65rem;
+    margin-bottom: 0.9rem;
+  }
+  .control-group {
+    min-width: 100%;
+    gap: 0.28rem;
+  }
+  .control-group label {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+  }
+  .update-row {
+    gap: 0.45rem;
+  }
+  #fileInputLabel,
+  #fetchRemoteBtn,
+  .help-btn,
+  .clear-btn {
+    flex: 1 1 calc(50% - 0.3rem);
+    text-align: center;
+    font-size: 0.68rem;
+    padding: 0.4rem 0.55rem;
+  }
+  #fetchStatus,
+  #dataAge {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.68rem;
+  }
+  .stats-row {
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+  }
+  .stat-card {
+    min-width: calc(50% - 0.25rem);
+    padding: 0.6rem 0.7rem;
+  }
+  .stat-card .value {
+    font-size: 0.95rem;
+  }
+  .chart-wrapper {
+    padding: 0.55rem;
+    border-radius: 9px;
+    min-height: 56vh;
+  }
+  #hChart {
+    height: 52vh !important;
+  }
+}
+
+@media (max-width: 520px) {
+  #binSlider {
+    width: 100%;
+  }
+  .bins-control {
+    width: 100%;
+  }
+  .stat-card {
+    min-width: 100%;
+  }
 }

@@ -22,6 +22,7 @@ let selectedClubs = [];
 let numBins = 62;
 let percentageMode = false;
 let chart = null;
+let chartResizeObserver = null;
 
 const searchEl = document.getElementById('clubSearch');
 const dropEl = document.getElementById('clubDropdown');
@@ -268,11 +269,20 @@ function renderChart(vals) {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 2.8,
+      maintainAspectRatio: false,
       animation: { duration: 250 },
       plugins: {
-        legend: { display: selectedClubs.length > 1, position: 'top' },
+        legend: {
+          display: selectedClubs.length > 1,
+          position: 'top',
+          labels: {
+            color: '#63584d',
+            font: { family: 'IBM Plex Mono', size: 10 },
+            boxWidth: 12,
+            boxHeight: 12,
+            padding: 10
+          }
+        },
         tooltip: {
           callbacks: {
             title: (items) => {
@@ -299,7 +309,7 @@ function renderChart(vals) {
           ticks: {
             color: '#63584d',
             font: { family: 'IBM Plex Mono', size: 10 },
-            maxTicksLimit: 13,
+            maxTicksLimit: window.matchMedia('(max-width: 860px)').matches ? 8 : 13,
             callback: function(val, idx) {
               const lbl = this.chart.data.labels[idx];
               const v = parseFloat(lbl);
@@ -500,6 +510,15 @@ document.addEventListener('DOMContentLoaded', () => {
     clampInputs();
     refresh();
   });
+
+  // Keep canvas in sync when container size changes without a window resize event.
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  if (chartWrapper && typeof ResizeObserver !== 'undefined') {
+    chartResizeObserver = new ResizeObserver(() => {
+      if (chart) chart.resize();
+    });
+    chartResizeObserver.observe(chartWrapper);
+  }
 
   try {
     const ts = parseInt(localStorage.getItem(CACHE_TS));

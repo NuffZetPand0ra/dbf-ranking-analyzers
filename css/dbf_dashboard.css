@@ -219,22 +219,24 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--accent);
-  color: #fff;
+  background: var(--surface-solid);
+  color: var(--muted);
   text-decoration: none;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 400;
   letter-spacing: 0.02em;
-  padding: 0.52rem 1rem;
+  padding: 0.38rem 0.64rem;
+  border: 1px solid var(--border);
   border-radius: 8px;
   white-space: nowrap;
-  transition: background 0.16s, transform 0.12s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
 }
 
 .cta-btn:hover {
-  background: var(--accent-strong);
-  transform: translateX(2px);
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 /* ── Footer ────────────────────────────────────────────── */
