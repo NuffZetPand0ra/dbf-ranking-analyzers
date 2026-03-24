@@ -19,5 +19,7 @@ This project uses a Node-based static server so files are easy to view in the br
 	- `npm run dev`
 3. Start the histogram page:
 	- `npm run dev:histogram`
+4. Start the combined dashboard:
+	- `npm run dev:dashboard`
 
 By default, `npm run dev` starts on port 4173 and opens `dbf_handicap.html`.

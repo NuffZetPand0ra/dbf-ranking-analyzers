@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DBf Analyzer Dashboard</title>
+<link rel="stylesheet" href="./css/analyzer-theme.css">
+<link rel="stylesheet" href="./css/dbf_dashboard.css">
+</head>
+<body>
+<main class="page dashboard-page">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">DBf Analyzer Dashboard</h1>
+      <p class="page-subtitle">Sammenligning og fordeling side om side</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="stackBtn" type="button">Stakket visning</button>
+      <button class="btn" id="sideBySideBtn" type="button">Side om side</button>
+      <button class="btn" id="reloadBtn" type="button">Genindlæs paneler</button>
+    </div>
+  </header>
+
+  <section id="dashboardGrid" class="dashboard-grid">
+    <article class="dashboard-card card">
+      <div class="card-head">
+        <div>
+          <h2>Handicap Sammenligning</h2>
+          <p>Upload spillerfiler og sammenlign udvikling</p>
+        </div>
+        <a href="./dbf_handicap.html" target="_blank" rel="noopener noreferrer">Åbn separat</a>
+      </div>
+      <div class="frame-wrap">
+        <iframe id="comparisonFrame" src="./dbf_handicap.html" title="DBf Handicap Sammenligning"></iframe>
+      </div>
+    </article>
+
+    <article class="dashboard-card card">
+      <div class="card-head">
+        <div>
+          <h2>Handicap Fordeling</h2>
+          <p>Upload HACAlle-fil og udforsk klubfordeling</p>
+        </div>
+        <a href="./dbf_handicap_histogram.html" target="_blank" rel="noopener noreferrer">Åbn separat</a>
+      </div>
+      <div class="frame-wrap">
+        <iframe id="histogramFrame" src="./dbf_handicap_histogram.html" title="DBf Handicap Fordeling"></iframe>
+      </div>
+    </article>
+  </section>
+</main>
+
+<script src="./js/dbf_dashboard.js"></script>
+</body>
+</html>
