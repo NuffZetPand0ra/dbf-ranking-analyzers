@@ -25,6 +25,14 @@
     <div class="file-row" id="pill-row">
       <span class="add-btn" id="add-btn">+ Tilføj spiller</span>
     </div>
+    <div class="fetch-row">
+      <span class="lbl">Hent spiller fra DBfNr</span>
+      <div class="fetch-controls">
+        <input type="text" id="dbf-number" inputmode="numeric" pattern="[0-9]*" placeholder="Fx 78976" aria-label="DBf nummer">
+        <span class="add-btn" id="fetch-player-btn">+ Hent fra DBf</span>
+        <span class="fetch-status" id="fetch-player-status"></span>
+      </div>
+    </div>
   </div>
   <div class="filter-zone">
     <div><span class="lbl">Fra dato</span><input type="date" id="from-date"></div>

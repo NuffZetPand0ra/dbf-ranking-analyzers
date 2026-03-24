@@ -1,6 +1,12 @@
 .top-bar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .file-zone { flex: 1 1 240px; }
 .file-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.fetch-row { margin-top: 8px; }
+.fetch-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#dbf-number { width: 130px; font-family: 'IBM Plex Mono', monospace; }
+.fetch-status { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+.fetch-status.ok { color: #14845f; }
+.fetch-status.err { color: var(--danger); }
 .pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); background: var(--surface-muted); color: var(--text); }
 .pill button { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; color: var(--muted); padding: 0; }
 .pill button:hover { color: var(--text); }

@@ -3,9 +3,126 @@ const players = [];
 let chart = null;
 let showPoints = true;
 let showHover = true;
+const LOOKUP_BASE_URL = '/api/lookup';
+const LOOKUP_CACHE_PREFIX = 'dbf_lookup_';
+const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 const btnPoints = document.getElementById('toggle-points');
 const btnHover = document.getElementById('toggle-hover');
+const dbfNumberInput = document.getElementById('dbf-number');
+const fetchPlayerBtn = document.getElementById('fetch-player-btn');
+const fetchPlayerStatus = document.getElementById('fetch-player-status');
+
+function setFetchPlayerStatus(msg, type) {
+  if (!fetchPlayerStatus) return;
+  fetchPlayerStatus.textContent = msg || '';
+  fetchPlayerStatus.className = 'fetch-status';
+  if (type === 'ok') fetchPlayerStatus.classList.add('ok');
+  if (type === 'err') fetchPlayerStatus.classList.add('err');
+}
+
+function pickDecoder(contentType) {
+  const m = (contentType || '').match(/charset\s*=\s*([^;]+)/i);
+  let charset = m ? m[1].trim().toLowerCase() : 'windows-1252';
+  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252';
+  try {
+    return new TextDecoder(charset);
+  } catch (_) {
+    return new TextDecoder('windows-1252');
+  }
+}
+
+function normalizeDbfNr(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function getLookupCacheKey(dbfNr) {
+  return LOOKUP_CACHE_PREFIX + dbfNr;
+}
+
+function readLookupCache(dbfNr) {
+  const key = getLookupCacheKey(dbfNr);
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || !parsed.html) return null;
+    const age = Date.now() - parsed.ts;
+    if (age > LOOKUP_CACHE_MAX_AGE_MS) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeLookupCache(dbfNr, html, source) {
+  const key = getLookupCacheKey(dbfNr);
+  try {
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), source, html }));
+  } catch (_) {}
+}
+
+async function fetchHtmlText(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const decoder = pickDecoder(res.headers.get('content-type'));
+  const buf = await res.arrayBuffer();
+  return decoder.decode(buf);
+}
+
+async function fetchLookupHtml(dbfNr) {
+  const lookupUrl = LOOKUP_BASE_URL + '?dbfNr=' + encodeURIComponent(dbfNr);
+  const html = await fetchHtmlText(lookupUrl);
+  return { html, source: 'backend' };
+}
+
+async function addPlayerFromDbfNumber() {
+  if (!dbfNumberInput || !fetchPlayerBtn) return;
+  const dbfNr = normalizeDbfNr(dbfNumberInput.value);
+  if (!dbfNr) {
+    setFetchPlayerStatus('Indtast et DBfNr', 'err');
+    dbfNumberInput.focus();
+    return;
+  }
+
+  const originalLabel = fetchPlayerBtn.textContent;
+  fetchPlayerBtn.textContent = 'Henter...';
+  fetchPlayerBtn.style.pointerEvents = 'none';
+  setFetchPlayerStatus('Henter spiller fra DBf...', '');
+
+  try {
+    let html;
+    let source;
+    const cached = readLookupCache(dbfNr);
+    if (cached) {
+      html = cached.html;
+      source = 'cache';
+    } else {
+      const fetched = await fetchLookupHtml(dbfNr);
+      html = fetched.html;
+      source = fetched.source;
+      writeLookupCache(dbfNr, html, source);
+    }
+
+    const parsed = parseHtml(html, 'DBF-' + dbfNr + '.html');
+    if (!parsed.entries.length) throw new Error('Ingen handicap-data fundet for DBfNr ' + dbfNr);
+    const withMeta = { ...parsed, dbfNr };
+    const idx = players.findIndex(p => p.dbfNr === dbfNr || p.name === parsed.name);
+    if (idx >= 0) players.splice(idx, 1, withMeta); else players.push(withMeta);
+
+    updateDateRange();
+    rebuildPills();
+    render();
+    setFetchPlayerStatus('Indlæst: ' + withMeta.name + ' (' + source + ')', 'ok');
+    dbfNumberInput.select();
+  } catch (err) {
+    setFetchPlayerStatus('Kunne ikke hente spiller', 'err');
+    alert('Kunne ikke hente DBf data: ' + err.message + '\n\nDu kan stadig uploade den gemte HTML-fil manuelt.');
+  } finally {
+    fetchPlayerBtn.textContent = originalLabel;
+    fetchPlayerBtn.style.pointerEvents = '';
+  }
+}
 
 btnPoints.addEventListener('click', () => {
   showPoints = !showPoints;
@@ -191,7 +308,7 @@ function rebuildPills() {
     const dot = document.createElement('span');
     dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${COLORS[i % COLORS.length]};display:inline-block`;
     const txt = document.createElement('span');
-    txt.textContent = p.name;
+    txt.textContent = p.dbfNr ? `${p.name} (#${p.dbfNr})` : p.name;
     const btn = document.createElement('button');
     btn.textContent = '×';
     btn.title = 'Fjern';
@@ -293,3 +410,16 @@ function render() {
 
 ['from-date', 'to-date', 'granularity'].forEach(id => document.getElementById(id).addEventListener('change', render));
 document.getElementById('tension').addEventListener('input', render);
+
+if (fetchPlayerBtn) {
+  fetchPlayerBtn.addEventListener('click', addPlayerFromDbfNumber);
+}
+
+if (dbfNumberInput) {
+  dbfNumberInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addPlayerFromDbfNumber();
+    }
+  });
+}

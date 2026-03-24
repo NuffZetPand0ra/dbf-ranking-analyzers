@@ -15,9 +15,11 @@
   <p id="headerDesc">Danmarks Bridgeforbund</p>
   <div class="update-row">
     <label id="fileInputLabel" for="fileInput" title="Upload HACAlle.php">📂 Indlæs ny datafil</label>
+    <button class="help-btn" id="fetchRemoteBtn" type="button" title="Hent HACAlle.php direkte fra DBf">🌐 Hent fra DBf</button>
     <input type="file" id="fileInput" accept=".html,.htm,.php" style="display:none">
     <button class="help-btn" id="helpBtn" type="button">? Hjælp</button>
     <button class="clear-btn" id="clearBtn">🗑 Ryd cache</button>
+    <span class="data-age" id="fetchStatus"></span>
     <span class="data-age" id="dataAge"></span>
   </div>
 </header>

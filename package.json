@@ -4,10 +4,10 @@
   "private": true,
   "description": "Static analyzers for DBF handicap views",
   "scripts": {
-    "dev": "live-server --port=4173 --open=dbf_handicap.html",
-    "dev:histogram": "live-server --port=4174 --open=dbf_handicap_histogram.html",
-    "dev:dashboard": "live-server --port=4175 --open=dbf_dashboard.html",
-    "preview": "live-server --port=4173 --no-browser"
+    "dev": "PORT=4173 node server.js",
+    "dev:histogram": "PORT=4174 OPEN_PAGE=dbf_handicap_histogram.html node server.js",
+    "dev:dashboard": "PORT=4175 OPEN_PAGE=dbf_dashboard.html node server.js",
+    "preview": "PORT=4173 OPEN_PAGE=dbf_handicap.html node server.js"
   },
   "devDependencies": {
     "live-server": "^1.2.2"

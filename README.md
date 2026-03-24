@@ -11,7 +11,7 @@ Various analyzers for bridge ranking in the Danish Bridge Federation
 - `js/dbf_handicap_histogram.js`: Script for histogram analyzer
 
 ## Run locally
-This project uses a Node-based static server so files are easy to view in the browser.
+This project uses a small Node server that serves the pages and relays DBf requests through local API routes to avoid browser CORS issues.
 
 1. Install dependencies:
 	- `npm install`
@@ -22,4 +22,10 @@ This project uses a Node-based static server so files are easy to view in the br
 4. Start the combined dashboard:
 	- `npm run dev:dashboard`
 
-By default, `npm run dev` starts on port 4173 and opens `dbf_handicap.html`.
+By default, `npm run dev` starts on port 4173.
+
+## Local relay API
+- `GET /api/hacalle` -> fetches `https://medlemmer.bridge.dk/HACAlle.php`
+- `GET /api/lookup?dbfNr=78976` -> fetches `https://medlemmer.bridge.dk/LookUpHAC.php?DBFNr=78976`
+
+Both frontend analyzers now use these local endpoints when you click the DBf fetch buttons.

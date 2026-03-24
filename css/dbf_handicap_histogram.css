@@ -48,6 +48,7 @@ canvas { display: block; }
 
 .update-row { display: flex; align-items: center; gap: 0.65rem; margin-top: 0.6rem; flex-wrap: wrap; }
 #fileInputLabel { font-size: 0.72rem; padding: 0.35rem 0.8rem; display: inline-block; }
+#fetchStatus { min-width: 9ch; }
 .data-age { font-size: 0.74rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); }
 .data-age.stale { color: var(--danger); }
 .data-age.fresh { color: #14845f; }

@@ -5,6 +5,7 @@ const ALL_VALUES = [];
 const CACHE_KEY = 'dbf_hac_data';
 const CACHE_TS = 'dbf_hac_ts';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const REMOTE_HAC_URL = '/api/hacalle';
 
 let currentClub = null;
 let numBins = 62;
@@ -17,6 +18,64 @@ const noDataOverlay = document.getElementById('noDataOverlay');
 const helpBtn = document.getElementById('helpBtn');
 const closeOverlayBtn = document.getElementById('closeOverlay');
 const uploadBtnBig = document.getElementById('uploadBtnBig');
+const fetchRemoteBtn = document.getElementById('fetchRemoteBtn');
+const fetchStatus = document.getElementById('fetchStatus');
+
+function setFetchStatus(msg, type) {
+  if (!fetchStatus) return;
+  fetchStatus.textContent = msg || '';
+  fetchStatus.className = 'data-age';
+  if (type === 'ok') fetchStatus.classList.add('fresh');
+  if (type === 'err') fetchStatus.classList.add('stale');
+}
+
+function pickDecoder(contentType) {
+  const m = (contentType || '').match(/charset\s*=\s*([^;]+)/i);
+  let charset = m ? m[1].trim().toLowerCase() : 'windows-1252';
+  if (charset === 'iso-8859-1' || charset === 'latin1') charset = 'windows-1252';
+  try {
+    return new TextDecoder(charset);
+  } catch (_) {
+    return new TextDecoder('windows-1252');
+  }
+}
+
+async function fetchHtmlText(url, signal) {
+  const res = await fetch(url, { signal, cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const decoder = pickDecoder(res.headers.get('content-type'));
+  const buf = await res.arrayBuffer();
+  return decoder.decode(buf);
+}
+
+async function fetchRemoteHacHtml(signal) {
+  const html = await fetchHtmlText(REMOTE_HAC_URL, signal);
+  return { html, source: 'backend' };
+}
+
+async function fetchAndApplyRemoteData() {
+  if (!fetchRemoteBtn) return;
+  fetchRemoteBtn.disabled = true;
+  setFetchStatus('Henter fra DBf...', '');
+  try {
+    const { html, source } = await fetchRemoteHacHtml();
+    const parsed = parseHACHtml(html);
+    const nPlayers = Object.values(parsed).flat().length;
+    if (nPlayers < 100) throw new Error('For få spillere fundet i svar (' + nPlayers + ')');
+    const ts = Date.now();
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
+      localStorage.setItem(CACHE_TS, String(ts));
+    } catch (_) {}
+    applyNewData(parsed, ts);
+    setFetchStatus('Hentet fra DBf (' + source + ')', 'ok');
+  } catch (err) {
+    setFetchStatus('Kunne ikke hente online data', 'err');
+    alert('Kunne ikke hente HACAlle.php automatisk: ' + err.message + '\n\nBrug upload-knappen i stedet.');
+  } finally {
+    fetchRemoteBtn.disabled = false;
+  }
+}
 
 function parseHACHtml(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -299,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('headerDesc').innerHTML = 'Danmarks Bridgeforbund';
     document.getElementById('dataAge').textContent = '';
     document.getElementById('dataAge').className = 'data-age';
+    setFetchStatus('');
     pillArea.innerHTML = '';
     searchEl.value = '';
     if (chart) {
@@ -322,6 +382,13 @@ document.addEventListener('DOMContentLoaded', () => {
   uploadBtnBig.addEventListener('click', () => {
     noDataOverlay.style.display = 'none';
   });
+
+  if (fetchRemoteBtn) {
+    fetchRemoteBtn.addEventListener('click', () => {
+      noDataOverlay.style.display = 'none';
+      fetchAndApplyRemoteData();
+    });
+  }
 
   searchEl.addEventListener('focus', () => renderDropdown(searchEl.value));
   searchEl.addEventListener('input', () => renderDropdown(searchEl.value));
