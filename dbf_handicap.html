@@ -29,7 +29,10 @@
     <div class="fetch-row">
       <span class="lbl">Hent spiller fra DBfNr</span>
       <div class="fetch-controls">
-        <input type="text" id="dbf-number" inputmode="numeric" pattern="[0-9]*" placeholder="Fx 78976" aria-label="DBf nummer">
+        <div class="autocomplete-wrapper">
+          <input type="text" id="dbf-number" placeholder="Søg efter spiller..." aria-label="Søg spiller" autocomplete="off">
+          <div class="autocomplete-dropdown" id="autocomplete-dropdown" style="display:none"></div>
+        </div>
         <span class="add-btn" id="fetch-player-btn">+ Hent fra DBf</span>
         <span class="fetch-status" id="fetch-player-status"></span>
       </div>

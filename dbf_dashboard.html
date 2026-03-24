@@ -13,9 +13,10 @@
 <div class="portal">
 
   <header class="hero">
-    <p class="hero-eyebrow">Det Danske Bridgeforbund</p>
+    <p class="hero-eyebrow">Uofficielle analyseværktøjer</p>
     <h1 class="hero-title">Handicap<span class="hero-accent">Analyzere</span></h1>
-    <p class="hero-sub">To lokale analyseværktøjer til DBf-handicapdata.<br>Alt behandles i din browser — ingen data forlader din computer.</p>
+    <p class="hero-sub">Lokale analyseværktøjer til DBf-handicapdata.<br>Alt behandles i din browser — ingen data forlader din computer.</p>
+    <p class="hero-badge">🔧 Bygget og vedligeholdt af <strong>Esben Tind</strong> · <span class="not-official">Ikke officielt tilknyttet DBf</span></p>
   </header>
 
   <section class="tool-grid" aria-label="Tilgængelige analyseværktøjer">
@@ -85,12 +86,13 @@
           <span class="tool-tag tag-teal">Spilleranalyse</span>
         </div>
         <h2 class="tool-name">Handicap&shy;sammenligning</h2>
-        <p class="tool-desc">Sammenlign op til ni spilleres handicapudvikling side om side. Upload individuelle spillerfiler fra bridge.dk og visualiser tendenser over valgfrie tidsperioder.</p>
+        <p class="tool-desc">Sammenlign spilleres handicapudvikling over tid. Upload individuelle spillerfiler fra bridge.dk og visualiser tendenser, identificer klubbernes topspillere og track progress over længere perioder.</p>
         <ul class="feature-list">
-          <li>Op til 9 spillere på ét diagram</li>
-          <li>Filtrer på datointerval og granularitet (dag / uge / måned / kvartal / år)</li>
-          <li>Statistik per spiller: gennemsnit, min, max og samlet sænkning</li>
-          <li>Justerbar kurveglattning</li>
+          <li>Sammenlign op til 9 spillere på ét diagram</li>
+          <li>Filtrer på dato, tidsperiode (dag / uge / måned / kvartal / år)</li>
+          <li>Gennemsnitshandicap, minimums- og maksimumshandicap og ændring per spiller</li>
+          <li>Se udvikling per klub ved at sammenligne klubbens spillere</li>
+          <li>Justerbar kurveglattning for klarere trends</li>
         </ul>
         <div class="tool-footer">
           <div class="datasource">
@@ -144,14 +146,15 @@
       </div>
       <div class="tool-body">
         <div class="tool-meta">
-          <span class="tool-tag tag-amber">Klubanalyse</span>
+          <span class="tool-tag tag-amber">Klubsammenligning</span>
         </div>
         <h2 class="tool-name">Handicap&shy;fordeling</h2>
-        <p class="tool-desc">Udforsk handicapfordelingen på tværs af alle danske bridgeklubber. Upload HACAlle-filen én gang og filtrer interaktivt på klub og histogram-opløsning.</p>
+        <p class="tool-desc">Analysér handicapfordelingen på tværs af klubber og sammenlign klubbernes handicapkarakteristika. Upload HACAlle-filen og udforsk detaljerede statistikker per klub.</p>
         <ul class="feature-list">
-          <li>Histogram over hele DBf's handicapspænd</li>
-          <li>Søg og filtrer ned til enkelt klub</li>
-          <li>Statistik: spredning, median, min/max per klub</li>
+          <li>Fuldt histogram over DBf's handicapspænd</li>
+          <li>Filtrer ned til enkelt klub for detaljeret analyse</li>
+          <li>Sammenlign klubbers spillerfordeling og medianhandicap</li>
+          <li>Statistik per klub: spredning, median, min/max, antal spillere</li>
           <li>24-timers lokal cache — ingen genupload nødvendig</li>
         </ul>
         <div class="tool-footer">
@@ -171,6 +174,7 @@
 
   <footer class="portal-footer">
     <p>Data hentes fra <a href="https://bridge.dk" target="_blank" rel="noopener noreferrer">bridge.dk</a> og behandles udelukkende lokalt i din browser — intet sendes til en ekstern server.</p>
+    <p style="margin-top: 0.8rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid rgba(255,225,185,0.08); padding-top: 0.8rem;"><strong>Disclaimer:</strong> Dette er uofficielle analyseværktøjer og er ikke godkendt eller vedligeholdt af Danmarks Bridgeforbund (DBf). Værktøjerne stilles til rådighed uden ansvar eller garanti. Eventuelle fejl eller tekniske problemer skal rapporteres til skaberen, ikke til DBf.</p>
   </footer>
 
 </div><!-- /.portal -->

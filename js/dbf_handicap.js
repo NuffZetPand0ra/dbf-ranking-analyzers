@@ -495,11 +495,101 @@ if (datePresetSelect) {
   });
 }
 
-if (fetchPlayerBtn) {
-  fetchPlayerBtn.addEventListener('click', addPlayerFromDbfNumber);
+let allPlayersCache = null;
+const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+
+async function fetchAllPlayers() {
+  if (allPlayersCache) return allPlayersCache;
+  try {
+    const res = await fetch('/api/hacalle');
+    if (!res.ok) throw new Error('Failed to fetch player list');
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const players = [];
+    for (const row of doc.querySelectorAll('tr.MasterPointEqualRow, tr.MasterPointOddRow')) {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 3) continue;
+      const playerLink = cells[1]?.querySelector('a');
+      const clubLink = cells[2]?.querySelector('a');
+      if (!playerLink) continue;
+      const hrefMatch = (playerLink.getAttribute('href') || '').match(/DBFNr=(\d+)/i);
+      if (!hrefMatch) continue;
+      players.push({
+        name: playerLink.textContent.trim(),
+        club: clubLink ? clubLink.textContent.trim() : '',
+        dbfNr: hrefMatch[1]
+      });
+    }
+    allPlayersCache = players;
+    return players;
+  } catch (err) {
+    console.error('Error fetching player list:', err);
+    return [];
+  }
+}
+
+function showAutocomplete(matches) {
+  if (!matches.length) {
+    autocompleteDropdown.style.display = 'none';
+    return;
+  }
+  autocompleteDropdown.innerHTML = matches.slice(0, 10).map(p =>
+    `<div class="autocomplete-item" data-dbf="${p.dbfNr}">
+      <div class="autocomplete-item-name">${p.name}</div>
+      <div class="autocomplete-item-club">${p.club} (${p.dbfNr})</div>
+    </div>`
+  ).join('');
+  autocompleteDropdown.style.display = 'block';
 }
 
 if (dbfNumberInput) {
+  // Show dropdown on input focus if there's any cached data
+  dbfNumberInput.addEventListener('focus', async () => {
+    const query = dbfNumberInput.value.trim();
+    if (query.length > 0) {
+      const allPlayers = await fetchAllPlayers();
+      const matches = allPlayers.filter(p =>
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.club.toLowerCase().includes(query.toLowerCase())
+      );
+      showAutocomplete(matches);
+    }
+  });
+
+  // Filter on each input
+  dbfNumberInput.addEventListener('input', async () => {
+    const query = dbfNumberInput.value.trim();
+    if (query.length === 0) {
+      autocompleteDropdown.style.display = 'none';
+      return;
+    }
+    const allPlayers = await fetchAllPlayers();
+    const matches = allPlayers.filter(p =>
+      p.name.toLowerCase().includes(query.toLowerCase()) ||
+      p.club.toLowerCase().includes(query.toLowerCase())
+    );
+    showAutocomplete(matches);
+  });
+
+  // Hide dropdown on blur
+  dbfNumberInput.addEventListener('blur', () => {
+    setTimeout(() => {
+      autocompleteDropdown.style.display = 'none';
+    }, 150);
+  });
+
+  // Click on dropdown item
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.autocomplete-item');
+    if (item) {
+      const dbfNr = item.dataset.dbf;
+      dbfNumberInput.value = dbfNr;
+      autocompleteDropdown.style.display = 'none';
+      addPlayerFromDbfNumber();
+    }
+  });
+
+  // Enter key
   dbfNumberInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -507,3 +597,10 @@ if (dbfNumberInput) {
     }
   });
 }
+
+if (fetchPlayerBtn) {
+  fetchPlayerBtn.addEventListener('click', addPlayerFromDbfNumber);
+}
+
+// Pre-fetch player list on load for autocomplete
+fetchAllPlayers();

@@ -41,6 +41,26 @@
   color: var(--muted);
 }
 
+.hero-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  margin-top: 1.4rem;
+  color: var(--muted);
+}
+
+.hero-badge strong {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.not-official {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  font-weight: 500;
+}
+
 /* ── Tool grid ─────────────────────────────────────────── */
 .tool-grid {
   display: grid;
