@@ -2,81 +2,21 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DBf Handicap Fordeling</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;600&display=swap');
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--accent:#58a6ff;--accent2:#f78166;--text:#e6edf3;--muted:#8b949e}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding:2rem}
-header{margin-bottom:2rem;border-bottom:1px solid var(--border);padding-bottom:1.5rem}
-header h1{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--accent);letter-spacing:-.02em}
-header p{color:var(--muted);font-size:.9rem;margin-top:.3rem}
-.controls{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;align-items:flex-end}
-.control-group{display:flex;flex-direction:column;gap:.4rem;flex:1;min-width:200px}
-.control-group label{font-size:.75rem;font-family:'Space Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.club-search-wrapper{position:relative}
-#clubSearch{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.6rem .8rem;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.95rem;outline:none;transition:border-color .2s}
-#clubSearch:focus{border-color:var(--accent)}
-#clubDropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;max-height:260px;overflow-y:auto;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-#clubDropdown.open{display:block}
-.dropdown-item{padding:.5rem .8rem;cursor:pointer;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;transition:background .1s}
-.dropdown-item:hover{background:var(--border)}
-.dropdown-item .count{font-family:'Space Mono',monospace;font-size:.75rem;color:var(--muted);margin-left:.5rem}
-.bins-control{display:flex;align-items:center;gap:.8rem}
-#binSlider{-webkit-appearance:none;width:160px;height:4px;background:var(--border);border-radius:2px;outline:none}
-#binSlider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--accent);border-radius:50%;cursor:pointer}
-#binValue{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--accent);min-width:2ch}
-.stats-row{display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.8rem 1.2rem;min-width:110px;flex:1}
-.stat-card .label{font-size:.72rem;font-family:'Space Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem}
-.stat-card .value{font-family:'Space Mono',monospace;font-size:1.25rem;font-weight:700;color:var(--accent)}
-.stat-card .value.neg{color:var(--accent2)}
-.chart-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem}
-canvas{display:block}
-.pill{display:inline-flex;align-items:center;gap:.5rem;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.4);border-radius:20px;padding:.3rem .8rem;font-size:.85rem;color:var(--accent);margin-top:.4rem}
-.pill button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0}
-.pill button:hover{color:var(--accent2)}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.update-row{display:flex;align-items:center;gap:.8rem;margin-top:.6rem;flex-wrap:wrap}
-#fileInputLabel{background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.4);color:var(--accent);font-family:'Space Mono',monospace;font-size:.75rem;padding:.35rem .8rem;border-radius:6px;cursor:pointer;transition:background .15s;display:inline-block}
-#fileInputLabel:hover{background:rgba(88,166,255,.22)}
-.data-age{font-size:.78rem;font-family:'Space Mono',monospace;color:var(--muted)}
-.data-age.stale{color:#f78166}
-.data-age.fresh{color:#3fb950}
-#noDataOverlay{position:fixed;inset:0;background:rgba(13,17,23,.92);display:flex;align-items:center;justify-content:center;z-index:200;padding:2rem}
-#noDataBox{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem 2.5rem;max-width:480px;width:100%}
-#noDataBox h2{font-family:'Space Mono',monospace;color:var(--accent);font-size:1.1rem;margin-bottom:1rem}
-#noDataBox p{color:var(--text);font-size:.9rem;line-height:1.6;margin-bottom:.8rem}
-#noDataBox ol{color:var(--text);font-size:.9rem;line-height:1.8;padding-left:1.2rem;margin-bottom:1rem}
-#noDataBox code{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--accent)}
-#noDataBox .url{word-break:break-all;color:#3fb950;font-family:'Space Mono',monospace;font-size:.82rem}
-#uploadBtnBig{background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.5);color:var(--accent);font-family:'Space Mono',monospace;font-size:.85rem;padding:.6rem 1.2rem;border-radius:8px;cursor:pointer;width:100%;margin-top:.5rem;transition:background .15s;display:block;text-align:center}
-#uploadBtnBig:hover{background:rgba(88,166,255,.28)}
-.clear-btn{background:rgba(247,129,102,.1);border:1px solid rgba(247,129,102,.4);color:var(--accent2);font-family:'Space Mono',monospace;font-size:.75rem;padding:.35rem .8rem;border-radius:6px;cursor:pointer;transition:background .15s}
-.clear-btn:hover{background:rgba(247,129,102,.2)}
-.help-btn{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.3);color:var(--accent);font-family:'Space Mono',monospace;font-size:.75rem;padding:.35rem .7rem;border-radius:6px;cursor:pointer;transition:background .15s}
-.help-btn:hover{background:rgba(88,166,255,.18)}
-#noDataOverlay{position:fixed;inset:0;background:rgba(13,17,23,.92);display:flex;align-items:center;justify-content:center;z-index:200;padding:2rem}
-#noDataBox{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem 2.5rem;max-width:480px;width:100%;position:relative}
-#noDataBox h2{font-family:'Space Mono',monospace;color:var(--accent);font-size:1.1rem;margin-bottom:1rem}
-#noDataBox p{color:var(--text);font-size:.9rem;line-height:1.6;margin-bottom:.8rem}
-#noDataBox ol{color:var(--text);font-size:.9rem;line-height:1.8;padding-left:1.2rem;margin-bottom:1rem}
-#noDataBox code{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--accent)}
-#noDataBox a.url{word-break:break-all;color:#3fb950;font-family:'Space Mono',monospace;font-size:.82rem}
-#closeOverlay{position:absolute;top:.8rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1;padding:.2rem .4rem;border-radius:4px}
-#closeOverlay:hover{color:var(--text)}
-</style>
+<link rel="stylesheet" href="./css/analyzer-theme.css">
+<link rel="stylesheet" href="./css/dbf_handicap_histogram.css">
 </head>
 <body>
+<main class="page">
 <header>
   <h1>DBf Handicap Fordeling</h1>
   <p id="headerDesc">Danmarks Bridgeforbund</p>
   <div class="update-row">
     <label id="fileInputLabel" for="fileInput" title="Upload HACAlle.php">📂 Indlæs ny datafil</label>
     <input type="file" id="fileInput" accept=".html,.htm,.php" style="display:none">
-    <button class="help-btn" onclick="document.getElementById('noDataOverlay').style.display='flex'">? Hjælp</button>
+    <button class="help-btn" id="helpBtn" type="button">? Hjælp</button>
     <button class="clear-btn" id="clearBtn">🗑 Ryd cache</button>
     <span class="data-age" id="dataAge"></span>
   </div>
@@ -84,7 +24,7 @@ canvas{display:block}
 
 <div id="noDataOverlay">
   <div id="noDataBox">
-    <button id="closeOverlay" onclick="document.getElementById('noDataOverlay').style.display='none'" title="Luk">✕</button>
+    <button id="closeOverlay" type="button" title="Luk">✕</button>
     <h2>Sådan henter du data</h2>
     <p>Hent den seneste handicapliste manuelt fra DBf og upload den her:</p>
     <ol>
@@ -94,7 +34,7 @@ canvas{display:block}
       <li>Upload den gemte fil herunder</li>
     </ol>
     <p>Filen gemmes i browseren og genbruges automatisk næste gang — du behøver kun at opdatere den, når dataene er forældede.</p>
-    <label id="uploadBtnBig" for="fileInput" onclick="document.getElementById('noDataOverlay').style.display='none'">📂 Vælg fil og indlæs</label>
+    <label id="uploadBtnBig" for="fileInput">📂 Vælg fil og indlæs</label>
   </div>
 </div>
 
@@ -137,300 +77,8 @@ canvas{display:block}
   <canvas id="hChart"></canvas>
 </div>
 
-<script>
-// ── Data (populated at runtime via file upload or localStorage) ───────────────
-const CLUB_DATA = {};
-const CLUB_NAMES = [];
-const ALL_VALUES = [];
+</main>
 
-const CACHE_KEY = 'dbf_hac_data';
-const CACHE_TS  = 'dbf_hac_ts';
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-function parseHACHtml(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const rows = doc.querySelectorAll('table tr');
-  const clubs = {};
-  for (const tr of rows) {
-    const cells = tr.querySelectorAll('td');
-    if (cells.length < 4) continue;
-    const hcText = cells[3] ? cells[3].textContent.trim().replace(',', '.') : '';
-    const hc = parseFloat(hcText);
-    if (isNaN(hc)) continue;
-    const club = cells[2] ? cells[2].textContent.trim() : '';
-    if (!club) continue;
-    if (!clubs[club]) clubs[club] = [];
-    clubs[club].push(hc);
-  }
-  for (const k of Object.keys(clubs)) clubs[k].sort((a, b) => a - b);
-  return clubs;
-}
-
-function applyNewData(clubData, timestamp) {
-  Object.keys(CLUB_DATA).forEach(k => delete CLUB_DATA[k]);
-  Object.assign(CLUB_DATA, clubData);
-  CLUB_NAMES.length = 0;
-  CLUB_NAMES.push(...Object.keys(CLUB_DATA).sort((a, b) => a.localeCompare(b, 'da')));
-  ALL_VALUES.length = 0;
-  ALL_VALUES.push(...Object.values(CLUB_DATA).flat());
-  const total = ALL_VALUES.length;
-  const nClubs = CLUB_NAMES.length;
-  document.getElementById('headerDesc').innerHTML =
-    'Danmarks Bridgeforbund &mdash; ' +
-    total.toLocaleString('da-DK') + ' spillere &middot; ' + nClubs + ' klubber';
-  // Update data age badge
-  const el = document.getElementById('dataAge');
-  if (timestamp) {
-    const age = Date.now() - timestamp;
-    const hrs = Math.floor(age / 3600000);
-    const mins = Math.floor((age % 3600000) / 60000);
-    el.textContent = hrs > 0 ? `Data: ${hrs}t ${mins}m gammel` : `Data: ${mins}m gammel`;
-    el.className = 'data-age ' + (age > MAX_AGE_MS ? 'stale' : 'fresh');
-  }
-  // Hide the no-data overlay
-  document.getElementById('noDataOverlay').style.display = 'none';
-  currentClub = null;
-  document.getElementById('pillArea').innerHTML = '';
-  document.getElementById('clubSearch').value = '';
-  refresh();
-}
-
-function handleFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const parsed = parseHACHtml(e.target.result);
-      const nPlayers = Object.values(parsed).flat().length;
-      if (nPlayers < 100) throw new Error('Kun ' + nPlayers + ' spillere fundet — forkert fil?');
-      const ts = Date.now();
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-        localStorage.setItem(CACHE_TS, String(ts));
-      } catch (_) {}
-      applyNewData(parsed, ts);
-    } catch (err) {
-      alert('Kunne ikke indlæse fil: ' + err.message);
-    }
-  };
-  reader.readAsText(file, 'utf-8');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const fi = document.getElementById('fileInput');
-  fi.addEventListener('change', () => { handleFile(fi.files[0]); fi.value = ''; });
-
-  document.getElementById('clearBtn').addEventListener('click', () => {
-    if (!confirm('Ryd cachet data? Du skal uploade en ny fil for at se histogrammet igen.')) return;
-    try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(CACHE_TS); } catch (_) {}
-    // Reset state
-    Object.keys(CLUB_DATA).forEach(k => delete CLUB_DATA[k]);
-    CLUB_NAMES.length = 0;
-    ALL_VALUES.length = 0;
-    document.getElementById('headerDesc').innerHTML = 'Danmarks Bridgeforbund';
-    document.getElementById('dataAge').textContent = '';
-    document.getElementById('dataAge').className = 'data-age';
-    document.getElementById('pillArea').innerHTML = '';
-    document.getElementById('clubSearch').value = '';
-    if (chart) { chart.destroy(); chart = null; }
-    ['sN','sMean','sMedian','sMin','sMax','sStd'].forEach(id => document.getElementById(id).textContent = '—');
-    document.getElementById('noDataOverlay').style.display = 'flex';
-  });
-
-  // Try loading from localStorage cache
-  try {
-    const ts = parseInt(localStorage.getItem(CACHE_TS));
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (raw && ts && !isNaN(ts)) {
-      applyNewData(JSON.parse(raw), ts);
-      if (Date.now() - ts > MAX_AGE_MS) {
-        document.getElementById('dataAge').textContent += ' — overvej at opdatere';
-        document.getElementById('dataAge').className = 'data-age stale';
-      }
-    }
-  } catch (_) {}
-});
-
-let currentClub = null;
-let numBins = 62;
-let chart = null;
-
-function stats(vals){
-  const s=[...vals].sort((a,b)=>a-b),n=s.length;
-  if(!n)return{};
-  const mean=s.reduce((x,v)=>x+v,0)/n;
-  const median=n%2===0?(s[n/2-1]+s[n/2])/2:s[Math.floor(n/2)];
-  const std=Math.sqrt(s.reduce((x,v)=>x+(v-mean)**2,0)/n);
-  return{n,mean,median,min:s[0],max:s[n-1],std};
-}
-
-function fmt(v){return v.toFixed(2).replace('.',',');}
-
-function updateStats(vals){
-  const s=stats(vals);
-  if(!s.n){
-    ['sN','sMean','sMedian','sMin','sMax','sStd'].forEach(id=>document.getElementById(id).textContent='—');
-    return;
-  }
-  document.getElementById('sN').textContent=s.n.toLocaleString('da-DK');
-  document.getElementById('sMean').textContent=fmt(s.mean);
-  document.getElementById('sMedian').textContent=fmt(s.median);
-  document.getElementById('sMin').textContent=fmt(s.min);
-  document.getElementById('sMax').textContent=fmt(s.max);
-  document.getElementById('sStd').textContent=fmt(s.std);
-}
-
-function getHcRange(){
-  const lo=parseFloat(document.getElementById('hcMin').value);
-  const hi=parseFloat(document.getElementById('hcMax').value);
-  return{lo:isNaN(lo)?-10:Math.max(-10,Math.min(lo,52)),hi:isNaN(hi)?52:Math.max(-10,Math.min(hi,52))};
-}
-function filterByRange(vals){
-  const{lo,hi}=getHcRange();
-  return vals.filter(v=>v>=lo&&v<=hi);
-}
-function buildHist(vals,bins){
-  const{lo:mn,hi:mx}=getHcRange();
-  const range=mx-mn;
-  if(range<=0)return{labels:[],counts:[],w:1};
-  const w=range/bins;
-  const counts=new Array(bins).fill(0);
-  const labels=[];
-  for(let i=0;i<bins;i++)labels.push((mn+i*w).toFixed(2));
-  for(const v of vals){
-    if(v<mn||v>mx)continue;
-    const idx=Math.min(Math.floor((v-mn)/w),bins-1);
-    if(idx>=0)counts[idx]++;
-  }
-  return{labels,counts,w};
-}
-
-function renderChart(vals){
-  const{labels,counts,w}=buildHist(vals,numBins);
-  const ctx=document.getElementById('hChart').getContext('2d');
-  if(chart)chart.destroy();
-  chart=new Chart(ctx,{
-    type:'bar',
-    data:{labels,datasets:[{
-      label:'Spillere',
-      data:counts,
-      backgroundColor:'rgba(31,111,235,0.72)',
-      hoverBackgroundColor:'rgba(56,139,253,0.92)',
-      borderColor:'transparent',
-      borderRadius:2,
-      barPercentage:1.0,
-      categoryPercentage:1.0
-    }]},
-    options:{
-      responsive:true,maintainAspectRatio:true,aspectRatio:2.8,
-      animation:{duration:250},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            title:(items)=>{
-              const lo=parseFloat(items[0].label);
-              return 'HC '+lo.toFixed(1).replace('.',',')+'–'+(lo+w).toFixed(1).replace('.',',');
-            },
-            label:(item)=>' '+item.raw+' spillere'
-          },
-          backgroundColor:'rgba(22,27,34,.97)',
-          borderColor:'rgba(48,54,61,1)',borderWidth:1,
-          titleColor:'#58a6ff',bodyColor:'#e6edf3',padding:10
-        }
-      },
-      scales:{
-        x:{
-          ticks:{color:'#8b949e',font:{family:'Space Mono',size:10},maxTicksLimit:13,
-            callback:function(val,idx){
-              const lbl=this.chart.data.labels[idx];
-              const v=parseFloat(lbl);
-              return isNaN(v)?'':v.toFixed(0);
-            }},
-          grid:{color:'rgba(48,54,61,.4)'},
-          border:{color:'transparent'},
-          title:{display:true,text:'Handicap',color:'#8b949e',font:{family:'DM Sans',size:12}}
-        },
-        y:{
-          ticks:{color:'#8b949e',font:{family:'Space Mono',size:10}},
-          grid:{color:'rgba(48,54,61,.4)'},
-          border:{color:'transparent',dash:[4,4]},
-          title:{display:true,text:'Antal spillere',color:'#8b949e',font:{family:'DM Sans',size:12}}
-        }
-      }
-    }
-  });
-}
-
-// Dropdown
-const searchEl=document.getElementById('clubSearch');
-const dropEl=document.getElementById('clubDropdown');
-const pillArea=document.getElementById('pillArea');
-
-function renderDropdown(q){
-  const filt=q?CLUB_NAMES.filter(c=>c.toLowerCase().includes(q.toLowerCase())):CLUB_NAMES;
-  dropEl.innerHTML='';
-  const allDiv=document.createElement('div');
-  allDiv.className='dropdown-item';
-  allDiv.innerHTML='<span><strong>Alle klubber</strong></span><span class="count">'+ALL_VALUES.length.toLocaleString('da-DK')+'</span>';
-  allDiv.addEventListener('mousedown',e=>{e.preventDefault();selectClub(null);});
-  dropEl.appendChild(allDiv);
-  filt.slice(0,100).forEach(club=>{
-    const d=document.createElement('div');
-    d.className='dropdown-item';
-    d.innerHTML='<span>'+club+'</span><span class="count">'+CLUB_DATA[club].length+'</span>';
-    d.addEventListener('mousedown',e=>{e.preventDefault();selectClub(club);});
-    dropEl.appendChild(d);
-  });
-  dropEl.classList.add('open');
-}
-
-function getCurrentVals(){
-  return currentClub?CLUB_DATA[currentClub]:ALL_VALUES;
-}
-function refresh(){
-  if(!ALL_VALUES.length) return;
-  const vals=getCurrentVals();
-  const filtered=filterByRange(vals);
-  renderChart(vals);
-  updateStats(filtered);
-}
-function selectClub(club){
-  currentClub=club;
-  dropEl.classList.remove('open');
-  searchEl.value='';
-  if(club){
-    pillArea.innerHTML='<div class="pill">'+club+'<button onclick="clearClub()">✕</button></div>';
-  } else {
-    pillArea.innerHTML='';
-  }
-  refresh();
-}
-
-function clearClub(){selectClub(null);}
-
-searchEl.addEventListener('focus',()=>renderDropdown(searchEl.value));
-searchEl.addEventListener('input',()=>renderDropdown(searchEl.value));
-searchEl.addEventListener('blur',()=>setTimeout(()=>dropEl.classList.remove('open'),150));
-
-document.getElementById('binSlider').addEventListener('input',function(){
-  numBins=parseInt(this.value);
-  document.getElementById('binValue').textContent=numBins;
-  refresh();
-});
-
-function clampInputs(){
-  const lo=parseFloat(document.getElementById('hcMin').value);
-  const hi=parseFloat(document.getElementById('hcMax').value);
-  if(!isNaN(lo)&&!isNaN(hi)&&lo>hi){
-    // swap if crossed
-    document.getElementById('hcMin').value=hi;
-    document.getElementById('hcMax').value=lo;
-  }
-}
-
-document.getElementById('hcMin').addEventListener('change',()=>{clampInputs();refresh();});
-document.getElementById('hcMax').addEventListener('change',()=>{clampInputs();refresh();});
-</script>
+<script src="./js/dbf_handicap_histogram.js"></script>
 </body>
 </html>

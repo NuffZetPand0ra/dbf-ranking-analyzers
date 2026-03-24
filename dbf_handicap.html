@@ -5,56 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DBf Handicap Sammenligning</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: #fff; color: #111; padding: 1.5rem; }
-@media (prefers-color-scheme: dark) { body { background: #1a1a1a; color: #eee; } }
-.top-bar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.file-zone { flex: 1 1 220px; }
-.file-zone > span { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
-.file-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 12px; border: 0.5px solid #ccc; background: #f5f5f5; color: #111; }
-@media (prefers-color-scheme: dark) { .pill { background: #2a2a2a; color: #eee; border-color: #444; } }
-.pill button { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; color: #888; padding: 0; }
-.pill button:hover { color: #111; }
-.filter-zone { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-.lbl { font-size: 12px; color: #666; display: block; margin-bottom: 3px; }
-.filter-zone input[type=date], .filter-zone select {
-  font-size: 12px; padding: 5px 8px; border: 0.5px solid #ccc; border-radius: 6px;
-  background: #fff; color: #111;
-}
-@media (prefers-color-scheme: dark) {
-  .filter-zone input[type=date], .filter-zone select { background: #2a2a2a; color: #eee; border-color: #444; }
-}
-.stats-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.stat-card { flex: 1 1 100px; background: #f5f5f5; border-radius: 6px; padding: 8px 12px; min-width: 90px; }
-@media (prefers-color-scheme: dark) { .stat-card { background: #2a2a2a; } }
-.stat-label { font-size: 11px; color: #666; margin-bottom: 2px; }
-.stat-val { font-size: 17px; font-weight: 500; }
-.stat-sub { font-size: 11px; color: #666; }
-.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: #666; }
-.chart-wrap { position: relative; width: 100%; height: 360px; }
-.empty { text-align: center; color: #888; font-size: 14px; padding: 60px 0; line-height: 2; }
-.add-btn {
-  font-size: 12px; padding: 5px 12px; border: 0.5px solid #ccc; border-radius: 6px;
-  background: #fff; color: #111; cursor: pointer; user-select: none; white-space: nowrap;
-}
-.add-btn:hover { background: #f5f5f5; }
-@media (prefers-color-scheme: dark) { .add-btn { background: #2a2a2a; color: #eee; border-color: #444; } }
-.toggle-btn {
-  font-size: 11px; padding: 3px 9px; border: 0.5px solid #ccc; border-radius: 6px;
-  background: #fff; color: #888; cursor: pointer; user-select: none; white-space: nowrap;
-}
-.toggle-btn.on { background: #f0f0f0; color: #111; border-color: #999; }
-.toggle-btn:hover { background: #f0f0f0; }
-@media (prefers-color-scheme: dark) {
-  .toggle-btn { background: #2a2a2a; color: #888; border-color: #444; }
-  .toggle-btn.on { background: #3a3a3a; color: #eee; border-color: #888; }
-}
-.controls-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-</style>
+<link rel="stylesheet" href="./css/analyzer-theme.css">
+<link rel="stylesheet" href="./css/dbf_handicap.css">
 </head>
 <body>
+<main class="page">
+<header class="page-header">
+  <div>
+    <h1 class="page-title">DBf Handicap Sammenligning</h1>
+    <p class="page-subtitle">Analyser udvikling for flere spillere i samme chart.</p>
+  </div>
+</header>
+
 <input type="file" id="file-input" accept=".html,.htm" multiple style="display:none">
 
 <div class="top-bar">
@@ -92,205 +54,13 @@ body { font-family: system-ui, sans-serif; background: #fff; color: #111; paddin
 <div class="legend" id="legend"></div>
 <div id="empty-msg" class="empty">
   Upload en eller flere DBf handicap HTML-filer for at se grafen.<br>
-  <small style="color:#aaa">Gem siden fra medlemmer.bridge.dk/LookUpHAC.php?DBFNr=XXXXX og upload den her.</small>
+  <small>Gem siden fra medlemmer.bridge.dk/LookUpHAC.php?DBFNr=XXXXX og upload den her.</small>
 </div>
 <div class="chart-wrap" id="chart-wrap" style="display:none"><canvas id="myChart"></canvas></div>
 <div class="stats-row" id="stats-row"></div>
 
-<script>
-const COLORS = ['#378ADD','#1D9E75','#D85A30','#D4537E','#7F77DD','#BA7517','#639922','#E24B4A','#888780'];
-const players = [];
-let chart = null;
-let showPoints = true;
-let showHover = true;
+</main>
 
-const btnPoints = document.getElementById('toggle-points');
-const btnHover  = document.getElementById('toggle-hover');
-
-btnPoints.addEventListener('click', () => {
-  showPoints = !showPoints;
-  btnPoints.classList.toggle('on', showPoints);
-  updatePointStyles();
-});
-
-btnHover.addEventListener('click', () => {
-  showHover = !showHover;
-  btnHover.classList.toggle('on', showHover);
-  if (chart) {
-    chart.options.plugins.tooltip.enabled = showHover;
-    chart.update('none');
-  }
-});
-
-function pointRadius() {
-  if (!showPoints) return 0;
-  return document.getElementById('granularity').value === 'all' ? 1.5 : 3;
-}
-
-function updatePointStyles() {
-  if (!chart) return;
-  const r = pointRadius();
-  chart.data.datasets.forEach(ds => {
-    ds.pointRadius = r;
-    ds.pointHoverRadius = showPoints ? 5 : 0;
-  });
-  chart.update('none');
-}
-
-document.getElementById('add-btn').addEventListener('click', () => document.getElementById('file-input').click());
-
-document.getElementById('file-input').addEventListener('change', function(e) {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-  let loaded = 0;
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const parsed = parseHtml(ev.target.result, file.name);
-      if (parsed.entries.length > 0) {
-        const idx = players.findIndex(p => p.name === parsed.name);
-        if (idx >= 0) players.splice(idx, 1, parsed); else players.push(parsed);
-      }
-      if (++loaded === files.length) { updateDateRange(); rebuildPills(); render(); }
-    };
-    reader.readAsText(file, 'windows-1252');
-  });
-  this.value = '';
-});
-
-function parseHtml(html, filename) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  let name = filename.replace(/\.html?$/i, '');
-  const title = doc.querySelector('title');
-  if (title) { const m = title.textContent.match(/for (.+)$/); if (m) name = m[1].trim(); }
-  if (name === filename.replace(/\.html?$/i,'')) {
-    for (const h of doc.querySelectorAll('h3')) {
-      const m = h.textContent.match(/Handicap for (.+?):/);
-      if (m) { name = m[1].trim(); break; }
-    }
-  }
-  const entries = [];
-  for (const row of doc.querySelectorAll('tr')) {
-    const cells = row.querySelectorAll('td');
-    if (cells.length < 5) continue;
-    const dm = cells[0].textContent.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (!dm) continue;
-    const hc = parseFloat(cells[4].textContent.trim().replace(/\u00a0/g,'').replace(',','.'));
-    if (isNaN(hc)) continue;
-    entries.push({ date: new Date(dm[3], dm[2]-1, dm[1]), hc });
-  }
-  entries.sort((a,b) => a.date - b.date);
-  return { name, entries };
-}
-
-function bucketKey(date, gran) {
-  const y = date.getFullYear(), m = date.getMonth();
-  if (gran === 'all') return date.toISOString().slice(0,10);
-  if (gran === 'week') { const j=new Date(y,0,1),w=Math.ceil(((date-j)/86400000+j.getDay()+1)/7); return `${y}-W${String(w).padStart(2,'0')}`; }
-  if (gran === 'month') return `${y}-${String(m+1).padStart(2,'0')}`;
-  if (gran === 'quarter') return `${y}-Q${Math.floor(m/3)+1}`;
-  return `${y}`;
-}
-
-function bucketLabel(key, gran) {
-  if (gran === 'all') { const d=new Date(key); return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`; }
-  if (gran === 'week') return key.replace('-W','\u00a0uge ');
-  if (gran === 'month') { const [y,m]=key.split('-'); return `${'jan feb mar apr maj jun jul aug sep okt nov dec'.split(' ')[+m-1]} ${y}`; }
-  if (gran === 'quarter') return key.replace('-','  ');
-  return key;
-}
-
-function getFrom() { const v=document.getElementById('from-date').value; return v?new Date(v):null; }
-function getTo()   { const v=document.getElementById('to-date').value; if(!v)return null; const d=new Date(v); d.setHours(23,59,59); return d; }
-
-function allKeys() {
-  const f=getFrom(),t=getTo(),g=document.getElementById('granularity').value,s=new Set();
-  for(const p of players) for(const e of p.entries){ if(f&&e.date<f)continue;if(t&&e.date>t)continue;s.add(bucketKey(e.date,g)); }
-  return Array.from(s).sort();
-}
-
-function buildDs(player, labels, gran) {
-  const f=getFrom(),t=getTo(),b={};
-  for(const e of player.entries){ if(f&&e.date<f)continue;if(t&&e.date>t)continue;const k=bucketKey(e.date,gran);(b[k]=b[k]||[]).push(e.hc); }
-  return labels.map(k=>{ if(!b[k])return null; const v=b[k]; return parseFloat((v.reduce((a,c)=>a+c,0)/v.length).toFixed(2)); });
-}
-
-function updateDateRange() {
-  let mn=null,mx=null;
-  for(const p of players) for(const e of p.entries){if(!mn||e.date<mn)mn=e.date;if(!mx||e.date>mx)mx=e.date;}
-  const fd=document.getElementById('from-date'),td=document.getElementById('to-date');
-  if(mn&&!fd.value)fd.value=mn.toISOString().slice(0,10);
-  if(mx&&!td.value)td.value=mx.toISOString().slice(0,10);
-}
-
-function rebuildPills() {
-  const row=document.getElementById('pill-row'); row.innerHTML='';
-  players.forEach((p,i)=>{
-    const pill=document.createElement('span'); pill.className='pill'; pill.style.borderColor=COLORS[i%COLORS.length];
-    const dot=document.createElement('span'); dot.style.cssText=`width:8px;height:8px;border-radius:50%;background:${COLORS[i%COLORS.length]};display:inline-block`;
-    const txt=document.createElement('span'); txt.textContent=p.name;
-    const btn=document.createElement('button'); btn.textContent='×'; btn.title='Fjern';
-    btn.addEventListener('click',(idx=>()=>{ players.splice(idx,1); rebuildPills(); render(); })(i));
-    pill.append(dot,txt,btn); row.appendChild(pill);
-  });
-  const ab=document.createElement('span'); ab.className='add-btn'; ab.textContent='+ Tilføj spiller';
-  ab.addEventListener('click',()=>document.getElementById('file-input').click());
-  row.appendChild(ab);
-}
-
-function render() {
-  const gran=document.getElementById('granularity').value;
-  const tension=parseFloat(document.getElementById('tension').value);
-  const labels=allKeys();
-  const r = pointRadius();
-
-  document.getElementById('empty-msg').style.display=players.length?'none':'';
-  document.getElementById('chart-wrap').style.display=players.length?'':'none';
-  document.getElementById('legend').innerHTML=players.map((p,i)=>
-    `<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i%COLORS.length]};display:inline-block"></span>${p.name}</span>`
-  ).join('');
-  document.getElementById('stats-row').innerHTML=players.map((p,i)=>{
-    const f=getFrom(),t=getTo(),fe=p.entries.filter(e=>(!f||e.date>=f)&&(!t||e.date<=t));
-    const last=fe.length?fe[fe.length-1].hc.toFixed(2):'–';
-    const best=fe.length?Math.min(...fe.map(e=>e.hc)).toFixed(2):'–';
-    return `<div class="stat-card" style="border-left:3px solid ${COLORS[i%COLORS.length]}"><div class="stat-label">${p.name}</div><div class="stat-val">${last}</div><div class="stat-sub">Bedste: ${best}</div></div>`;
-  }).join('');
-
-  if(!players.length){if(chart){chart.destroy();chart=null;}return;}
-
-  const datasets=players.map((p,i)=>({
-    label:p.name, data:buildDs(p,labels,gran),
-    borderColor:COLORS[i%COLORS.length], backgroundColor:COLORS[i%COLORS.length]+'22',
-    borderWidth:2, pointRadius:r, pointHoverRadius:showPoints?5:0,
-    tension, fill:false, spanGaps:true
-  }));
-  const cl=labels.map(k=>bucketLabel(k,gran));
-
-  if(chart){
-    chart.data.labels=cl; chart.data.datasets=datasets;
-    chart.options.plugins.tooltip.enabled=showHover;
-    chart.update();
-  } else {
-    chart=new Chart(document.getElementById('myChart'),{
-      type:'line', data:{labels:cl,datasets},
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        interaction:{mode:'index',intersect:false},
-        plugins:{
-          legend:{display:false},
-          tooltip:{enabled:showHover,callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.parsed.y!==null?ctx.parsed.y.toFixed(2):'–'}`}}
-        },
-        scales:{
-          x:{ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:20,font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},
-          y:{reverse:true,title:{display:true,text:'Handicap',font:{size:12}},ticks:{font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}}
-        }
-      }
-    });
-  }
-}
-
-['from-date','to-date','granularity'].forEach(id=>document.getElementById(id).addEventListener('change',render));
-document.getElementById('tension').addEventListener('input',render);
-</script>
+<script src="./js/dbf_handicap.js"></script>
 </body>
 </html>
