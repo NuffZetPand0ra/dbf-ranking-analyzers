@@ -1,5 +1,6 @@
 const COLORS = ['#378ADD', '#1D9E75', '#D85A30', '#D4537E', '#7F77DD', '#BA7517', '#639922', '#E24B4A', '#888780'];
 const players = [];
+const hiddenPlayers = new Set();
 let chart = null;
 let showPoints = true;
 let showHover = true;
@@ -314,20 +315,47 @@ function rebuildPills() {
   players.forEach((p, i) => {
     const pill = document.createElement('span');
     pill.className = 'pill';
+    const isHidden = hiddenPlayers.has(i);
     pill.style.borderColor = COLORS[i % COLORS.length];
+    pill.style.opacity = isHidden ? '0.4' : '1';
+    pill.style.cursor = 'pointer';
+    pill.style.transition = 'opacity 0.2s';
+    
     const dot = document.createElement('span');
     dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${COLORS[i % COLORS.length]};display:inline-block`;
+    
     const txt = document.createElement('span');
     txt.textContent = p.dbfNr ? `${p.name} (#${p.dbfNr})` : p.name;
+    
     const btn = document.createElement('button');
     btn.textContent = '×';
     btn.title = 'Fjern';
-    btn.addEventListener('click', ((idx) => () => {
-      players.splice(idx, 1);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      players.splice(i, 1);
+      hiddenPlayers.delete(i);
+      for (let idx of hiddenPlayers) {
+        if (idx > i) {
+          hiddenPlayers.delete(idx);
+          hiddenPlayers.add(idx - 1);
+        }
+      }
       rebuildPills();
       render();
-    })(i));
+    });
+    
+    const toggleVisibility = () => {
+      if (hiddenPlayers.has(i)) {
+        hiddenPlayers.delete(i);
+      } else {
+        hiddenPlayers.add(i);
+      }
+      rebuildPills();
+      render();
+    };
+    
     pill.append(dot, txt, btn);
+    pill.addEventListener('click', toggleVisibility);
     row.appendChild(pill);
   });
   const ab = document.createElement('span');
@@ -345,10 +373,36 @@ function render() {
 
   document.getElementById('empty-msg').style.display = players.length ? 'none' : '';
   document.getElementById('chart-wrap').style.display = players.length ? '' : 'none';
-  document.getElementById('legend').innerHTML = players.map((p, i) =>
-    `<span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i % COLORS.length]};display:inline-block"></span>${p.name}</span>`
-  ).join('');
-  document.getElementById('stats-row').innerHTML = players.map((p, i) => {
+  
+  const visiblePlayers = players.map((p, i) => ({ p, i })).filter(({ i }) => !hiddenPlayers.has(i));
+  
+  const legendDiv = document.getElementById('legend');
+  legendDiv.innerHTML = '';
+  players.forEach((p, i) => {
+    const span = document.createElement('span');
+    span.className = 'legend-item';
+    const isHidden = hiddenPlayers.has(i);
+    span.style.opacity = isHidden ? '0.4' : '1';
+    span.style.cursor = 'pointer';
+    
+    const dot = document.createElement('span');
+    dot.style.cssText = `width:10px;height:10px;border-radius:2px;background:${COLORS[i % COLORS.length]};display:inline-block`;
+    const label = document.createElement('span');
+    label.textContent = p.name;
+    
+    span.append(dot, label);
+    span.addEventListener('click', () => {
+      if (hiddenPlayers.has(i)) {
+        hiddenPlayers.delete(i);
+      } else {
+        hiddenPlayers.add(i);
+      }
+      rebuildPills();
+      render();
+    });
+    legendDiv.appendChild(span);
+  });
+  document.getElementById('stats-row').innerHTML = visiblePlayers.map(({ p, i }) => {
     const f = getFrom();
     const t = getTo();
     const fe = p.entries.filter(e => (!f || e.date >= f) && (!t || e.date <= t));
@@ -365,7 +419,7 @@ function render() {
     return;
   }
 
-  const datasets = players.map((p, i) => ({
+  const datasets = visiblePlayers.map(({ p, i }) => ({
     label: p.name,
     data: buildDs(p, labels, gran),
     borderColor: COLORS[i % COLORS.length],
@@ -421,6 +475,25 @@ function render() {
 
 ['from-date', 'to-date', 'granularity'].forEach(id => document.getElementById(id).addEventListener('change', render));
 document.getElementById('tension').addEventListener('input', render);
+
+const datePresetSelect = document.getElementById('date-preset');
+if (datePresetSelect) {
+  datePresetSelect.addEventListener('change', () => {
+    const months = parseInt(datePresetSelect.value, 10);
+    if (isNaN(months)) return;
+    
+    const today = new Date();
+    const from = new Date(today);
+    from.setMonth(from.getMonth() - months);
+    
+    const fromDateEl = document.getElementById('from-date');
+    const toDateEl = document.getElementById('to-date');
+    fromDateEl.value = from.toISOString().slice(0, 10);
+    toDateEl.value = today.toISOString().slice(0, 10);
+    datePresetSelect.value = '';
+    render();
+  });
+}
 
 if (fetchPlayerBtn) {
   fetchPlayerBtn.addEventListener('click', addPlayerFromDbfNumber);
