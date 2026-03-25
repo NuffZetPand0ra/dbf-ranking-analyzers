@@ -20,6 +20,12 @@
 .pill:hover { background: var(--surface-solid); border-color: var(--accent); }
 .pill button { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; color: var(--muted); padding: 0; transition: color 0.2s; }
 .pill button:hover { color: var(--text); }
+.pill-group { border-style: dashed; font-style: italic; cursor: default; }
+.pill-group-select { font-size: 10px; padding: 1px 3px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-muted); color: var(--muted); cursor: pointer; max-width: 90px; font-family: inherit; transition: border-color 0.15s, background 0.15s; }
+.pill-group-select:hover, .pill-group-select:focus { border-color: var(--accent); outline: none; }
+.legend-item-group { opacity: 0.85; cursor: default; }
+.group-create-form { display: inline-flex; align-items: center; gap: 4px; }
+.group-create-input { font-size: 12px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--accent); background: var(--surface-muted); color: var(--text); outline: none; width: 140px; font-family: inherit; }
 
 .filter-zone { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .filter-zone input[type=date], .filter-zone select { font-size: 12px; }
