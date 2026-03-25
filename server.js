@@ -7,7 +7,8 @@ const { URL } = require('url');
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = process.cwd();
-const DEFAULT_PAGE = process.env.OPEN_PAGE || 'dbf_dashboard.html';
+const STATIC_ROOT = path.join(ROOT, '_site');
+const DEFAULT_ROUTE = process.env.OPEN_ROUTE || '/';
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
@@ -37,26 +38,55 @@ function sendJson(res, status, payload) {
 }
 
 function isSafePath(candidatePath) {
-  const resolved = path.resolve(ROOT, candidatePath);
-  return resolved.startsWith(ROOT + path.sep) || resolved === ROOT;
+  const resolved = path.resolve(STATIC_ROOT, candidatePath);
+  return resolved.startsWith(STATIC_ROOT + path.sep) || resolved === STATIC_ROOT;
+}
+
+async function resolveStaticFile(pathname) {
+  const candidates = [];
+
+  if (pathname === '/') {
+    candidates.push('index.html');
+  } else if (pathname.endsWith('/')) {
+    candidates.push(path.join(pathname.replace(/^\/+/, ''), 'index.html'));
+  } else {
+    const cleanPath = pathname.replace(/^\/+/, '');
+    candidates.push(cleanPath);
+    if (!path.extname(cleanPath)) {
+      candidates.push(`${cleanPath}.html`);
+      candidates.push(path.join(cleanPath, 'index.html'));
+    }
+  }
+
+  for (const candidate of candidates) {
+    const candidatePath = path.join(STATIC_ROOT, candidate);
+    if (!isSafePath(candidatePath)) {
+      continue;
+    }
+
+    try {
+      const stat = await fsp.stat(candidatePath);
+      if (stat.isFile()) {
+        return candidatePath;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 async function serveStatic(reqUrl, res) {
-  let pathname = decodeURIComponent(reqUrl.pathname);
-  if (pathname === '/') pathname = '/' + DEFAULT_PAGE;
+  const pathname = decodeURIComponent(reqUrl.pathname);
+  const filePath = await resolveStaticFile(pathname);
 
-  const filePath = path.join(ROOT, pathname);
-  if (!isSafePath(filePath)) {
-    sendJson(res, 403, { error: 'Forbidden path' });
+  if (!filePath) {
+    sendJson(res, 404, { error: 'Not found' });
     return;
   }
 
   try {
-    const stat = await fsp.stat(filePath);
-    if (stat.isDirectory()) {
-      sendJson(res, 404, { error: 'Directory listing not allowed' });
-      return;
-    }
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME[ext] || 'application/octet-stream';
     res.writeHead(200, {
@@ -186,7 +216,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const base = `http://${HOST}:${PORT}`;
   console.log('DBf analyzer server started');
-  console.log('Open:', `${base}/${DEFAULT_PAGE}`);
-  console.log('Histogram:', `${base}/dbf_handicap_histogram.html`);
-  console.log('Dashboard:', `${base}/dbf_dashboard.html`);
+  console.log('Open:', `${base}${DEFAULT_ROUTE}`);
+  console.log('Handicap comparison:', `${base}/tools/handicap-comparison/`);
+  console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
 });

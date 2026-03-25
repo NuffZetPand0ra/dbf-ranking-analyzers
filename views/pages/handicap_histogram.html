@@ -1,45 +1,23 @@
-<!DOCTYPE html>
-<html lang="da">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.">
-<meta name="theme-color" content="#0f766e">
-<meta name="color-scheme" content="light dark">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Handicap Fordeling">
-<link rel="icon" type="image/svg+xml" href="./favicon.svg">
-<link rel="apple-touch-icon" href="./favicon.svg">
-<link rel="manifest" href="./manifest.json">
-<meta property="og:title" content="DBf Handicap Fordeling">
-<meta property="og:description" content="Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.">
-<meta property="og:type" content="website">
-<meta property="og:locale" content="da_DK">
-<meta property="og:image" content="./favicon.svg">
-<link rel="sitemap" href="./sitemap.xml" type="application/xml">
-<title>DBf Handicap Fordeling</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="./css/analyzer-theme.css">
-<link rel="stylesheet" href="./css/dbf_handicap_histogram.css">
-<script>if(localStorage.getItem('dbf_theme')!=='light')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','light');</script>
-</head>
-<body>
+---
+layout: base.hbs
+title: DBf Handicap Fordeling
+ogTitle: DBf Handicap Fordeling
+description: Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.
+appleTitle: Handicap Fordeling
+headScripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js
+stylesheets:
+  - /css/analyzer-theme.css
+  - /css/dbf_handicap_histogram.css
+bodyScripts:
+  - /js/utils.js
+  - /js/dbf_handicap_histogram.js
+  - /js/theme.js
+permalink: /tools/handicap-distribution/index.html
+---
 <main class="page">
 <header>
-  <div class="header-title-row">
-    <div>
-      <h1>DBf Handicap Fordeling</h1>
-      <p id="headerDesc">Danmarks Bridgeforbund</p>
-    </div>
-    <div class="header-tools">
-      <a href="./dbf_dashboard.html" class="back-link" aria-label="Til forsiden">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg>
-        Forside
-      </a>
-      <div id="theme-toggle-slot"></div>
-    </div>
-  </div>
+  {{> analyzer_header headerRowClass="header-title-row" title="DBf Handicap Fordeling" subtitle="Danmarks Bridgeforbund" subtitleId="headerDesc"}}
   <div class="update-row">
     <button class="help-btn" id="fetchRemoteBtn" type="button" title="Hent HACAlle.php direkte fra DBf">🌐 Hent fra DBf</button>
     <button class="help-btn" id="shareLinkBtn" type="button" title="Kopiér link med nuværende filtre">🔗 Del link</button>
@@ -127,10 +105,6 @@
   <canvas id="hChart"></canvas>
 </div>
 
-</main>
+{{> footer wrapperClass="page-footer"}}
 
-<script src="./js/utils.js"></script>
-<script src="./js/dbf_handicap_histogram.js"></script>
-<script src="./js/theme.js"></script>
-</body>
-</html>
+</main>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="{{description}}">
+<meta name="theme-color" content="#0f766e">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="{{appleTitle}}">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<link rel="manifest" href="/manifest.json">
+<meta property="og:title" content="{{ogTitle}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="da_DK">
+<meta property="og:image" content="/favicon.svg">
+<link rel="sitemap" href="/sitemap.xml" type="application/xml">
+<title>{{title}}</title>
+{{#each headScripts}}
+<script src="{{this}}"></script>
+{{/each}}
+{{#each stylesheets}}
+<link rel="stylesheet" href="{{this}}">
+{{/each}}
+<script>if(localStorage.getItem('dbf_theme')!=='light')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','light');</script>
+</head>
+<body>
+{{{ content }}}
+{{#each bodyScripts}}
+<script src="{{this}}"></script>
+{{/each}}
+</body>
+</html>
