@@ -422,14 +422,24 @@ function render() {
     anchorHc   = currentHc;
   }
 
-  // Regression for prediction slope — use the filtered window so the prediction
-  // reflects the trend the user is currently looking at.  Centre x-values on
-  // the first entry to prevent catastrophic float cancellation with large
-  // epoch-day numbers (n·ΣXX − (ΣX)² collapses without centering).
+  // Regression for prediction slope.
+  // Use the filtered window, but enforce a minimum of 6 months so that a
+  // tiny blip in a short view window can't produce an absurd slope.
+  // If the filtered window is shorter than 6 months, extend it back in time.
+  // Centre x-values to prevent catastrophic float cancellation.
+  const MIN_REG_MS = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
   let rawSlope = 0;
+  let regEntries = filteredEntries;
   if (filteredEntries.length >= 2) {
-    const x0  = filteredEntries[0].date / 86400000;
-    const pts = filteredEntries.map(e => ({ x: e.date / 86400000 - x0, y: e.hc }));
+    const filteredSpan = filteredEntries[filteredEntries.length - 1].date - filteredEntries[0].date;
+    if (filteredSpan < MIN_REG_MS) {
+      const windowStart = new Date(anchorDate.getTime() - MIN_REG_MS);
+      regEntries = currentPlayer.entries.filter(e => e.date >= windowStart && e.date <= anchorDate);
+    }
+  }
+  if (regEntries.length >= 2) {
+    const x0  = regEntries[0].date / 86400000;
+    const pts = regEntries.map(e => ({ x: e.date / 86400000 - x0, y: e.hc }));
     rawSlope = linearRegression(pts).slope;
   }
 
