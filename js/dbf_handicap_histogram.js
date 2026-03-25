@@ -21,6 +21,7 @@ const CLUB_COLORS = [
 let selectedClubs = [];
 let numBins = 62;
 let percentageMode = false;
+let showCdf = false;
 let chart = null;
 let chartResizeObserver = null;
 let isRestoringState = false;
@@ -101,6 +102,7 @@ function buildStateParams() {
   if (hcMax) params.set('max', hcMax);
   if (numBins !== 62) params.set('bins', String(numBins));
   if (percentageMode) params.set('pct', '1');
+  if (showCdf) params.set('cdf', '1');
   selectedClubs.forEach(club => params.append('club', club));
   return params;
 }
@@ -195,6 +197,7 @@ function restoreStateFromUrl() {
     max: params.get('max'),
     bins: params.get('bins'),
     pct: params.get('pct') === '1',
+    cdf: params.get('cdf') === '1',
     clubs: params.getAll('club')
   };
 }
@@ -204,6 +207,7 @@ function applyPendingUrlStateToInputs() {
   const slider = document.getElementById('binSlider');
   const binValue = document.getElementById('binValue');
   const pctBox = document.getElementById('percentMode');
+  const cdfBox = document.getElementById('cdfMode');
   const hcMin = document.getElementById('hcMin');
   const hcMax = document.getElementById('hcMax');
 
@@ -217,6 +221,8 @@ function applyPendingUrlStateToInputs() {
 
   percentageMode = pendingUrlState.pct;
   pctBox.checked = percentageMode;
+  showCdf = pendingUrlState.cdf;
+  if (cdfBox) cdfBox.checked = showCdf;
 
   if (pendingUrlState.min !== null) hcMin.value = pendingUrlState.min;
   if (pendingUrlState.max !== null) hcMax.value = pendingUrlState.max;
@@ -385,9 +391,36 @@ function renderChart(vals) {
       borderColor: 'transparent',
       borderRadius: 2,
       barPercentage: multiClub ? 0.8 : 1.0,
-      categoryPercentage: multiClub ? 0.8 : 1.0
+      categoryPercentage: multiClub ? 0.8 : 1.0,
+      yAxisID: 'y'
     };
   });
+
+  if (showCdf) {
+    datasets.forEach(ds => {
+      const total = ds.data.reduce((sum, v) => sum + v, 0);
+      if (!total) return;
+      let running = 0;
+      const cdfData = ds.data.map(count => {
+        running += count;
+        return (running / total) * 100;
+      });
+      const solidColor = CLUB_COLORS[ds.color].replace('0.72', '1');
+      chartDatasets.push({
+        type: 'line',
+        label: 'CDF' + (datasets.length > 1 ? ' ' + ds.label : ''),
+        data: cdfData,
+        yAxisID: 'y2',
+        borderColor: solidColor,
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+        spanGaps: true
+      });
+    });
+  }
   
   chart = new Chart(ctx, {
     type: 'bar',
@@ -401,7 +434,7 @@ function renderChart(vals) {
       animation: { duration: 250 },
       plugins: {
         legend: {
-          display: selectedClubs.length > 1,
+          display: selectedClubs.length > 1 || showCdf,
           position: 'top',
           labels: {
             color: '#63584d',
@@ -448,12 +481,25 @@ function renderChart(vals) {
           border: { color: 'transparent' },
           title: { display: true, text: 'Handicap', color: '#63584d', font: { family: 'Manrope', size: 12 } }
         },
-        y: {
-          ticks: { color: '#63584d', font: { family: 'IBM Plex Mono', size: 10 } },
-          grid: { color: 'rgba(64,52,40,.16)' },
-          border: { color: 'transparent', dash: [4, 4] },
-          title: { display: true, text: percentageMode ? 'Procent af klub' : 'Antal spillere', color: '#63584d', font: { family: 'Manrope', size: 12 } }
-        }
+          y: {
+            ticks: { color: '#63584d', font: { family: 'IBM Plex Mono', size: 10 } },
+            grid: { color: 'rgba(64,52,40,.16)' },
+            border: { color: 'transparent', dash: [4, 4] },
+            title: { display: true, text: percentageMode ? 'Procent af klub' : 'Antal spillere', color: '#63584d', font: { family: 'Manrope', size: 12 } }
+          },
+          y2: showCdf ? {
+            position: 'right',
+            min: 0,
+            max: 100,
+            ticks: {
+              color: '#63584d',
+              font: { family: 'IBM Plex Mono', size: 10 },
+              callback: v => v + '%'
+            },
+            grid: { drawOnChartArea: false },
+            border: { color: 'transparent' },
+            title: { display: true, text: 'Kumulativ %', color: '#63584d', font: { family: 'Manrope', size: 12 } }
+          } : { display: false }
       }
     }
   });
@@ -572,7 +618,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ALL_VALUES.length = 0;
     selectedClubs.length = 0;
     percentageMode = false;
+    showCdf = false;
     document.getElementById('percentMode').checked = false;
+    document.getElementById('cdfMode').checked = false;
     document.getElementById('headerDesc').innerHTML = 'Danmarks Bridgeforbund';
     document.getElementById('dataAge').textContent = '';
     document.getElementById('dataAge').className = 'data-age';
@@ -633,6 +681,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('percentMode').addEventListener('change', function() {
     percentageMode = this.checked;
+    refresh();
+  });
+
+  document.getElementById('cdfMode').addEventListener('change', function() {
+    showCdf = this.checked;
     refresh();
   });
 
