@@ -56,26 +56,25 @@ function readLookupCache(dbfNr) {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || !parsed.ts || !parsed.html) return null;
-    const age = Date.now() - parsed.ts;
-    if (age > LOOKUP_CACHE_MAX_AGE_MS) return null;
+    if (!parsed || !parsed.ts || !parsed.data) return null;
+    if (Date.now() - parsed.ts > LOOKUP_CACHE_MAX_AGE_MS) return null;
     return parsed;
   } catch (_) {
     return null;
   }
 }
 
-function writeLookupCache(dbfNr, html, source) {
+function writeLookupCache(dbfNr, data, source) {
   const key = getLookupCacheKey(dbfNr);
   try {
-    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), source, html }));
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), source, data }));
   } catch (_) {}
 }
 
-async function fetchLookupHtml(dbfNr) {
-  const lookupUrl = LOOKUP_BASE_URL + '?dbfNr=' + encodeURIComponent(dbfNr);
-  const html = await fetchHtmlText(lookupUrl);
-  return { html, source: 'backend' };
+async function fetchLookupData(dbfNr) {
+  const res = await fetch(LOOKUP_BASE_URL + '?dbfNr=' + encodeURIComponent(dbfNr));
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
 }
 
 async function addPlayerByDbfNr(dbfNr, options) {
@@ -95,23 +94,22 @@ async function addPlayerByDbfNr(dbfNr, options) {
   }
 
   try {
-    let html;
+    let playerData;
     let source;
     const cached = readLookupCache(normalized);
     if (cached) {
-      html = cached.html;
+      playerData = cached.data;
       source = 'cache';
     } else {
-      const fetched = await fetchLookupHtml(normalized);
-      html = fetched.html;
-      source = fetched.source;
-      writeLookupCache(normalized, html, source);
+      playerData = await fetchLookupData(normalized);
+      source = 'backend';
+      writeLookupCache(normalized, playerData, source);
     }
 
-    const parsed = parseHtml(html, 'DBF-' + normalized + '.html');
-    if (!parsed.entries.length) throw new Error('Ingen handicap-data fundet for DBfNr ' + normalized);
-    const withMeta = { ...parsed, dbfNr: normalized };
-    const idx = players.findIndex(p => p.dbfNr === normalized || p.name === parsed.name);
+    const entries = playerData.entries.map(e => ({ date: new Date(e.date), hc: e.hc }));
+    if (!entries.length) throw new Error('Ingen handicap-data fundet for DBfNr ' + normalized);
+    const withMeta = { name: playerData.name, entries, dbfNr: normalized };
+    const idx = players.findIndex(p => p.dbfNr === normalized || p.name === withMeta.name);
     if (idx >= 0) players.splice(idx, 1, withMeta); else players.push(withMeta);
 
     if (!skipRender) {
@@ -188,36 +186,6 @@ function updatePointStyles() {
   chart.update();
 }
 
-function parseHtml(html, filename) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  let name = filename.replace(/\.html?$/i, '');
-  const title = doc.querySelector('title');
-  if (title) {
-    const m = title.textContent.match(/for (.+)$/);
-    if (m) name = m[1].trim();
-  }
-  if (name === filename.replace(/\.html?$/i, '')) {
-    for (const h of doc.querySelectorAll('h3')) {
-      const m = h.textContent.match(/Handicap for (.+?):/);
-      if (m) {
-        name = m[1].trim();
-        break;
-      }
-    }
-  }
-  const entries = [];
-  for (const row of doc.querySelectorAll('tr')) {
-    const cells = row.querySelectorAll('td');
-    if (cells.length < 5) continue;
-    const dm = cells[0].textContent.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (!dm) continue;
-    const hc = parseFloat(cells[4].textContent.trim().replace(/\u00a0/g, '').replace(',', '.'));
-    if (isNaN(hc)) continue;
-    entries.push({ date: new Date(dm[3], dm[2] - 1, dm[1]), hc });
-  }
-  entries.sort((a, b) => a.date - b.date);
-  return { name, entries };
-}
 
 function bucketKey(date, gran) {
   const y = date.getFullYear();
@@ -718,26 +686,12 @@ async function fetchAllPlayers() {
     return cachedPlayers;
   }
   try {
-    const html = await fetchHtmlText('/api/hacalle');
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const players = [];
-    for (const row of doc.querySelectorAll('tr.MasterPointEqualRow, tr.MasterPointOddRow')) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 3) continue;
-      const playerLink = cells[1]?.querySelector('a');
-      const clubLink = cells[2]?.querySelector('a');
-      if (!playerLink) continue;
-      const hrefMatch = (playerLink.getAttribute('href') || '').match(/DBFNr=(\d+)/i);
-      if (!hrefMatch) continue;
-      players.push({
-        name: playerLink.textContent.trim().replace(/\s+/g, ' '),
-        club: clubLink ? clubLink.textContent.trim().replace(/\s+/g, ' ') : '',
-        dbfNr: hrefMatch[1]
-      });
-    }
-    allPlayersCache = players;
-    writeAllPlayersCache(players);
-    return players;
+    const res = await fetch('/api/hacalle');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    allPlayersCache = data.players;
+    writeAllPlayersCache(data.players);
+    return data.players;
   } catch (err) {
     console.error('Error fetching player list:', err);
     return [];

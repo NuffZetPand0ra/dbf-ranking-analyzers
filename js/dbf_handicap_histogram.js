@@ -159,9 +159,15 @@ function setFetchStatus(msg, type) {
   if (type === 'err') fetchStatus.classList.add('stale');
 }
 
-async function fetchRemoteHacHtml(signal) {
-  const html = await fetchHtmlText(REMOTE_HAC_URL, signal);
-  return { html, source: 'backend' };
+function buildClubMap(players) {
+  const clubs = {};
+  for (const p of players) {
+    if (!p.club) continue;
+    if (!clubs[p.club]) clubs[p.club] = [];
+    clubs[p.club].push(p.hc);
+  }
+  for (const k of Object.keys(clubs)) clubs[k].sort((a, b) => a - b);
+  return clubs;
 }
 
 async function fetchAndApplyRemoteData() {
@@ -169,8 +175,10 @@ async function fetchAndApplyRemoteData() {
   fetchRemoteBtn.disabled = true;
   setFetchStatus('Henter fra DBf...', '');
   try {
-    const { html, source } = await fetchRemoteHacHtml();
-    const parsed = parseHACHtml(html);
+    const res = await fetch(REMOTE_HAC_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const parsed = buildClubMap(data.players);
     const nPlayers = Object.values(parsed).flat().length;
     if (nPlayers < 100) throw new Error('For få spillere fundet i svar (' + nPlayers + ')');
     const ts = Date.now();
@@ -179,32 +187,13 @@ async function fetchAndApplyRemoteData() {
       localStorage.setItem(CACHE_TS, String(ts));
     } catch (_) {}
     applyNewData(parsed, ts);
-    setFetchStatus('Hentet fra DBf (' + source + ')', 'ok');
+    setFetchStatus('Hentet fra DBf', 'ok');
   } catch (err) {
     setFetchStatus('Kunne ikke hente online data', 'err');
     alert('Kunne ikke hente HACAlle.php automatisk: ' + err.message + '\n\nPrøv igen om lidt eller hent data på ny fra DBf.');
   } finally {
     fetchRemoteBtn.disabled = false;
   }
-}
-
-function parseHACHtml(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const rows = doc.querySelectorAll('table tr');
-  const clubs = {};
-  for (const tr of rows) {
-    const cells = tr.querySelectorAll('td');
-    if (cells.length < 4) continue;
-    const hcText = cells[3] ? cells[3].textContent.trim().replace(',', '.') : '';
-    const hc = parseFloat(hcText);
-    if (isNaN(hc)) continue;
-    const club = cells[2] ? cells[2].textContent.trim() : '';
-    if (!club) continue;
-    if (!clubs[club]) clubs[club] = [];
-    clubs[club].push(hc);
-  }
-  for (const k of Object.keys(clubs)) clubs[k].sort((a, b) => a - b);
-  return clubs;
 }
 
 function buildStateParams() {

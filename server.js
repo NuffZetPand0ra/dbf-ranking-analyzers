@@ -13,8 +13,10 @@ const DEFAULT_ROUTE = process.env.OPEN_ROUTE || '/';
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
 const HACALLE_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 let hacalleCache = null;
+const lookupCache = new Map(); // dbfNr -> { ts, data }
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -99,49 +101,74 @@ async function serveStatic(reqUrl, res) {
   }
 }
 
-async function relayRemote(res, remoteUrl) {
-  try {
-    const upstream = await fetch(remoteUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'dbf-ranking-analyzers/1.0 relay'
-      }
-    });
-
-    if (!upstream.ok) {
-      sendJson(res, 502, {
-        error: 'Upstream fetch failed',
-        status: upstream.status,
-        remoteUrl
-      });
-      return;
-    }
-
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    const contentType = upstream.headers.get('content-type') || 'text/html; charset=windows-1252';
-
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Cache-Control': 'no-store',
-      'X-Relay-Source': remoteUrl
-    });
-    res.end(buffer);
-  } catch (err) {
-    sendJson(res, 502, {
-      error: 'Relay request failed',
-      message: err.message,
-      remoteUrl
-    });
-  }
+function decodeWindows1252(buffer) {
+  return new TextDecoder('windows-1252').decode(buffer);
 }
 
-function sendHtmlBuffer(res, buffer, contentType, extraHeaders) {
-  res.writeHead(200, {
-    'Content-Type': contentType || 'text/html; charset=windows-1252',
-    'Cache-Control': 'no-store',
-    ...extraHeaders
-  });
-  res.end(buffer);
+function extractCells(rowHtml) {
+  const cells = [];
+  const re = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  let m;
+  while ((m = re.exec(rowHtml)) !== null) cells.push(m[1]);
+  return cells;
+}
+
+function stripTags(html) {
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseHacalleHtml(html) {
+  const players = [];
+  const rowRe = /<tr[^>]+class="[^"]*MasterPoint(?:Equal|Odd)Row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  while ((rowMatch = rowRe.exec(html)) !== null) {
+    const cells = extractCells(rowMatch[1]);
+    if (cells.length < 4) continue;
+    const dbfNrMatch = cells[1].match(/DBFNr=(\d+)/i);
+    const nameMatch = cells[1].match(/<a\b[^>]*>([^<]+)<\/a>/i);
+    if (!dbfNrMatch || !nameMatch) continue;
+    const dbfNr = dbfNrMatch[1];
+    const name = nameMatch[1].trim().replace(/\s+/g, ' ');
+    const club = stripTags(cells[2]);
+    const hc = parseFloat(stripTags(cells[3]).replace(',', '.'));
+    if (isNaN(hc)) continue;
+    players.push({ name, club, dbfNr, hc });
+  }
+  return players;
+}
+
+function parseLookupHtml(html) {
+  let name = '';
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch) {
+    const m = titleMatch[1].match(/for (.+)$/);
+    if (m) name = m[1].trim();
+  }
+  if (!name) {
+    const h3Match = html.match(/Handicap for (.+?):/i);
+    if (h3Match) name = h3Match[1].trim();
+  }
+
+  const entries = [];
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  while ((rowMatch = rowRe.exec(html)) !== null) {
+    const cells = extractCells(rowMatch[1]);
+    if (cells.length < 5) continue;
+    const dateText = stripTags(cells[0]);
+    const dm = dateText.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (!dm) continue;
+    const hc = parseFloat(stripTags(cells[4]).replace(/\u00a0/g, '').replace(',', '.'));
+    if (isNaN(hc)) continue;
+    entries.push({ date: `${dm[3]}-${dm[2]}-${dm[1]}`, hc });
+  }
+  entries.sort((a, b) => a.date.localeCompare(b.date));
+  return { name, entries };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -158,44 +185,28 @@ const server = http.createServer(async (req, res) => {
     const isFresh = hacalleCache && now - hacalleCache.ts <= HACALLE_CACHE_MAX_AGE_MS;
 
     if (!forceRefresh && isFresh) {
-      sendHtmlBuffer(res, hacalleCache.buffer, hacalleCache.contentType, {
-        'X-Relay-Source': HACALLE_URL,
-        'X-Relay-Cache': 'HIT'
-      });
+      sendJson(res, 200, { players: hacalleCache.players, cachedAt: hacalleCache.ts, cache: 'HIT' });
       return;
     }
 
     try {
       const upstream = await fetch(HACALLE_URL, {
         method: 'GET',
-        headers: {
-          'User-Agent': 'dbf-ranking-analyzers/1.0 relay'
-        }
+        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
       });
 
       if (!upstream.ok) {
-        sendJson(res, 502, {
-          error: 'Upstream fetch failed',
-          status: upstream.status,
-          remoteUrl: HACALLE_URL
-        });
+        sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
         return;
       }
 
       const buffer = Buffer.from(await upstream.arrayBuffer());
-      const contentType = upstream.headers.get('content-type') || 'text/html; charset=windows-1252';
-      hacalleCache = { ts: now, buffer, contentType };
+      const players = parseHacalleHtml(decodeWindows1252(buffer));
+      hacalleCache = { ts: now, players };
 
-      sendHtmlBuffer(res, buffer, contentType, {
-        'X-Relay-Source': HACALLE_URL,
-        'X-Relay-Cache': 'MISS'
-      });
+      sendJson(res, 200, { players, cachedAt: now, cache: 'MISS' });
     } catch (err) {
-      sendJson(res, 502, {
-        error: 'Relay request failed',
-        message: err.message,
-        remoteUrl: HACALLE_URL
-      });
+      sendJson(res, 502, { error: 'Relay request failed', message: err.message });
     }
     return;
   }
@@ -206,7 +217,33 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 400, { error: 'Missing dbfNr query param' });
       return;
     }
-    await relayRemote(res, `${LOOKUP_BASE_URL}?DBFNr=${encodeURIComponent(dbfNr)}`);
+
+    const now = Date.now();
+    const forceRefresh = reqUrl.searchParams.get('refresh') === '1';
+    const cached = lookupCache.get(dbfNr);
+    if (!forceRefresh && cached && now - cached.ts <= LOOKUP_CACHE_MAX_AGE_MS) {
+      sendJson(res, 200, { ...cached.data, dbfNr, cachedAt: cached.ts, cache: 'HIT' });
+      return;
+    }
+
+    try {
+      const upstream = await fetch(`${LOOKUP_BASE_URL}?DBFNr=${encodeURIComponent(dbfNr)}`, {
+        method: 'GET',
+        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+      });
+
+      if (!upstream.ok) {
+        sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
+        return;
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const data = parseLookupHtml(decodeWindows1252(buffer));
+      lookupCache.set(dbfNr, { ts: now, data });
+      sendJson(res, 200, { ...data, dbfNr, cachedAt: now, cache: 'MISS' });
+    } catch (err) {
+      sendJson(res, 502, { error: 'Relay request failed', message: err.message });
+    }
     return;
   }
 
