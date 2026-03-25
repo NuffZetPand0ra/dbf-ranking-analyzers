@@ -55,11 +55,24 @@ const shareLinkBtn = document.getElementById('shareLinkBtn');
 const exportChartBtn = document.getElementById('exportChartBtn');
 const clearClubsBtn = document.getElementById('clearClubsBtn');
 const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+const setMinBtn = document.getElementById('setMinBtn');
 const inactiveCapBtn = document.getElementById('inactiveCapBtn');
 const fetchStatus = document.getElementById('fetchStatus');
 
 function getDefaultMinValue() {
   return String(ALL_VALUES.length ? Math.floor(Math.min(...ALL_VALUES)) : -10);
+}
+
+function getCurrentSelectionMinFloor() {
+  const vals = getCurrentVals();
+  if (!vals.length) return null;
+  return Math.floor(Math.min(...vals));
+}
+
+function updateSetMinButtonLabel() {
+  if (!setMinBtn) return;
+  const minFloor = getCurrentSelectionMinFloor();
+  setMinBtn.textContent = minFloor === null ? 'Min' : 'Min ' + String(minFloor).replace('.', ',');
 }
 
 function updateInactiveCapButtonLabel() {
@@ -77,6 +90,8 @@ function clearClubSelections() {
   selectedClubs.length = 0;
   searchEl.value = '';
   updatePills();
+  updateSetMinButtonLabel();
+  updateClearClubsButtonState();
   dropEl.classList.remove('open');
   refresh();
 }
@@ -95,6 +110,7 @@ function resetFilters() {
   document.getElementById('percentMode').checked = false;
   document.getElementById('cdfMode').checked = false;
   document.getElementById('trendMode').checked = false;
+  updateSetMinButtonLabel();
   updateInactiveCapButtonLabel();
   updateClearClubsButtonState();
 
@@ -109,6 +125,15 @@ function capInactivePlayers() {
   const current = parseFloat(hcMaxInput.value);
   hcMaxInput.value = Math.abs(current - 52) < 0.001 ? '51.99' : '52';
   updateInactiveCapButtonLabel();
+  clampInputs();
+  refresh();
+}
+
+function setCurrentSelectionMin() {
+  const minFloor = getCurrentSelectionMinFloor();
+  if (minFloor === null) return;
+  document.getElementById('hcMin').value = String(minFloor);
+  updateSetMinButtonLabel();
   clampInputs();
   refresh();
 }
@@ -334,6 +359,7 @@ function applyPendingUrlStateToData() {
   }
   clampInputs();
   updatePills();
+  updateSetMinButtonLabel();
   updateClearClubsButtonState();
   isRestoringState = false;
   pendingUrlState = null;
@@ -379,6 +405,7 @@ function applyNewData(clubData, timestamp) {
   searchEl.value = '';
   updateClearClubsButtonState();
   applyPendingUrlStateToData();
+  if (!pendingUrlState) updateSetMinButtonLabel();
   refresh();
 }
 
@@ -691,6 +718,7 @@ function selectClub(club) {
     selectedClubs.push(club);
   }
   updatePills();
+  updateSetMinButtonLabel();
   updateClearClubsButtonState();
   dropEl.classList.remove('open');
   searchEl.value = '';
@@ -718,6 +746,8 @@ function updatePills() {
     btn.addEventListener('click', () => {
       selectedClubs.splice(idx, 1);
       updatePills();
+      updateSetMinButtonLabel();
+      updateClearClubsButtonState();
       refresh();
     });
     pill.appendChild(btn);
@@ -738,6 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreStateFromUrl();
   applyPendingUrlStateToInputs();
   updatePills();
+  updateSetMinButtonLabel();
   updateClearClubsButtonState();
 
   document.getElementById('clearBtn').addEventListener('click', () => {
@@ -767,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setFetchStatus('');
     pillArea.innerHTML = '';
     searchEl.value = '';
+    updateSetMinButtonLabel();
     updateClearClubsButtonState();
     if (chart) {
       chart.destroy();
@@ -809,6 +841,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (inactiveCapBtn) {
     inactiveCapBtn.addEventListener('click', () => {
       capInactivePlayers();
+    });
+  }
+
+  if (setMinBtn) {
+    setMinBtn.addEventListener('click', () => {
+      setCurrentSelectionMin();
     });
   }
 
