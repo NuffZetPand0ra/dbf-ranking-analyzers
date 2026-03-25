@@ -55,6 +55,7 @@ header p { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-si
 }
 
 .pill { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(13, 148, 136, 0.11); border: 1px solid rgba(13, 148, 136, 0.42); border-radius: 20px; padding: 0.3rem 0.8rem; font-size: 0.85rem; color: var(--accent); margin-top: 0.4rem; }
+.pill-default { background: rgba(99, 88, 77, 0.08); border-color: rgba(99, 88, 77, 0.22); color: var(--muted); }
 .pill button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
 .pill button:hover { color: var(--danger); }
 

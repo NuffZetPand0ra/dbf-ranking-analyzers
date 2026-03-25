@@ -56,13 +56,20 @@
       <div id="clubDropdown"></div>
     </div>
     <div id="pillArea"></div>
+    <div class="bins-control" style="gap:.5rem;flex-wrap:wrap;margin-top:.6rem">
+      <button class="help-btn" id="clearClubsBtn" type="button">Fjern alle klubber</button>
+    </div>
   </div>
   <div class="control-group" style="max-width:220px">
     <label>HC interval</label>
     <div class="bins-control" style="gap:.5rem">
-      <input type="number" id="hcMin" value="-10" min="-10" max="52" step="1" style="width:62px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;outline:none">
+      <input type="number" id="hcMin" value="-10" min="-10" max="52" step="any" inputmode="decimal" style="width:78px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;outline:none">
       <span style="color:var(--muted);font-size:.85rem">–</span>
-      <input type="number" id="hcMax" value="52" min="-10" max="52" step="1" style="width:62px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;outline:none">
+      <input type="number" id="hcMax" value="52" min="-10" max="52" step="any" inputmode="decimal" style="width:78px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;outline:none">
+    </div>
+    <div class="bins-control" style="gap:.5rem;flex-wrap:wrap;margin-top:.6rem">
+      <button class="help-btn" id="inactiveCapBtn" type="button">Max 51,99</button>
+      <button class="help-btn" id="clearFiltersBtn" type="button">Ryd filtre</button>
     </div>
   </div>
   <div class="control-group" style="max-width:260px">

@@ -53,7 +53,78 @@ const closeOverlayBtn = document.getElementById('closeOverlay');
 const fetchRemoteBtn = document.getElementById('fetchRemoteBtn');
 const shareLinkBtn = document.getElementById('shareLinkBtn');
 const exportChartBtn = document.getElementById('exportChartBtn');
+const clearClubsBtn = document.getElementById('clearClubsBtn');
+const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+const inactiveCapBtn = document.getElementById('inactiveCapBtn');
 const fetchStatus = document.getElementById('fetchStatus');
+
+function getDefaultMinValue() {
+  return String(ALL_VALUES.length ? Math.floor(Math.min(...ALL_VALUES)) : -10);
+}
+
+function updateInactiveCapButtonLabel() {
+  if (!inactiveCapBtn) return;
+  const hcMax = parseFloat(document.getElementById('hcMax').value);
+  inactiveCapBtn.textContent = Math.abs(hcMax - 52) < 0.001 ? 'Max 51,99' : 'Max 52';
+}
+
+function updateClearClubsButtonState() {
+  if (!clearClubsBtn) return;
+  clearClubsBtn.disabled = selectedClubs.length === 0;
+}
+
+function clearClubSelections() {
+  selectedClubs.length = 0;
+  searchEl.value = '';
+  updatePills();
+  dropEl.classList.remove('open');
+  refresh();
+}
+
+function resetFilters() {
+  selectedClubs.length = 0;
+  numBins = 62;
+  percentageMode = false;
+  showCdf = false;
+  showTrendline = false;
+
+  document.getElementById('hcMin').value = getDefaultMinValue();
+  document.getElementById('hcMax').value = '52';
+  document.getElementById('binSlider').value = '62';
+  document.getElementById('binValue').textContent = '62';
+  document.getElementById('percentMode').checked = false;
+  document.getElementById('cdfMode').checked = false;
+  document.getElementById('trendMode').checked = false;
+  updateInactiveCapButtonLabel();
+  updateClearClubsButtonState();
+
+  searchEl.value = '';
+  updatePills();
+  clampInputs();
+  refresh();
+}
+
+function capInactivePlayers() {
+  const hcMaxInput = document.getElementById('hcMax');
+  const current = parseFloat(hcMaxInput.value);
+  hcMaxInput.value = Math.abs(current - 52) < 0.001 ? '51.99' : '52';
+  updateInactiveCapButtonLabel();
+  clampInputs();
+  refresh();
+}
+
+function stepRangeInputByInteger(event) {
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+  event.preventDefault();
+  const input = event.currentTarget;
+  const current = parseFloat(input.value);
+  const fallback = input.id === 'hcMin' ? getHcRange().lo : getHcRange().hi;
+  const base = Number.isNaN(current) ? fallback : current;
+  const delta = event.key === 'ArrowUp' ? 1 : -1;
+  input.value = String(base + delta);
+  clampInputs();
+  refresh();
+}
 
 function setFetchStatus(msg, type) {
   if (!fetchStatus) return;
@@ -86,7 +157,7 @@ async function fetchAndApplyRemoteData() {
     setFetchStatus('Hentet fra DBf (' + source + ')', 'ok');
   } catch (err) {
     setFetchStatus('Kunne ikke hente online data', 'err');
-    alert('Kunne ikke hente HACAlle.php automatisk: ' + err.message + '\n\nBrug upload-knappen i stedet.');
+    alert('Kunne ikke hente HACAlle.php automatisk: ' + err.message + '\n\nPrøv igen om lidt eller hent data på ny fra DBf.');
   } finally {
     fetchRemoteBtn.disabled = false;
   }
@@ -248,6 +319,7 @@ function applyPendingUrlStateToInputs() {
 
   if (pendingUrlState.min !== null) hcMin.value = pendingUrlState.min;
   if (pendingUrlState.max !== null) hcMax.value = pendingUrlState.max;
+  updateInactiveCapButtonLabel();
 }
 
 function applyPendingUrlStateToData() {
@@ -262,6 +334,7 @@ function applyPendingUrlStateToData() {
   }
   clampInputs();
   updatePills();
+  updateClearClubsButtonState();
   isRestoringState = false;
   pendingUrlState = null;
 }
@@ -282,6 +355,8 @@ function applyNewData(clubData, timestamp) {
     hcMinInput.min = String(dataMinFloor);
     hcMaxInput.min = String(dataMinFloor);
   }
+  hcMaxInput.step = '0.01';
+  updateInactiveCapButtonLabel();
 
   const total = ALL_VALUES.length;
   const nClubs = CLUB_NAMES.length;
@@ -302,6 +377,7 @@ function applyNewData(clubData, timestamp) {
   selectedClubs.length = 0;
   pillArea.innerHTML = '';
   searchEl.value = '';
+  updateClearClubsButtonState();
   applyPendingUrlStateToData();
   refresh();
 }
@@ -342,7 +418,7 @@ function getHcRange() {
   const hi = parseFloat(document.getElementById('hcMax').value);
   return {
     lo: isNaN(lo) ? lowerBound : Math.max(lowerBound, Math.min(lo, 52)),
-    hi: isNaN(hi) ? 52 : Math.max(lowerBound, Math.min(hi, 52))
+    hi: isNaN(hi) ? 52 : Math.max(lowerBound, Math.min(hi, 51.99))
   };
 }
 
@@ -615,6 +691,7 @@ function selectClub(club) {
     selectedClubs.push(club);
   }
   updatePills();
+  updateClearClubsButtonState();
   dropEl.classList.remove('open');
   searchEl.value = '';
   refresh();
@@ -622,7 +699,13 @@ function selectClub(club) {
 
 function updatePills() {
   pillArea.innerHTML = '';
-  if (!selectedClubs.length) return;
+  if (!selectedClubs.length) {
+    const pill = document.createElement('div');
+    pill.className = 'pill pill-default';
+    pill.textContent = 'Alle klubber';
+    pillArea.appendChild(pill);
+    return;
+  }
   selectedClubs.forEach((club, idx) => {
     const pill = document.createElement('div');
     pill.className = 'pill';
@@ -654,9 +737,11 @@ function clampInputs() {
 document.addEventListener('DOMContentLoaded', () => {
   restoreStateFromUrl();
   applyPendingUrlStateToInputs();
+  updatePills();
+  updateClearClubsButtonState();
 
   document.getElementById('clearBtn').addEventListener('click', () => {
-    if (!confirm('Ryd cachet data? Du skal uploade en ny fil for at se histogrammet igen.')) return;
+    if (!confirm('Ryd cachet data? Histogrammet henter automatisk friske data igen næste gang.')) return;
     try {
       localStorage.removeItem(CACHE_KEY);
       localStorage.removeItem(CACHE_TS);
@@ -682,6 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setFetchStatus('');
     pillArea.innerHTML = '';
     searchEl.value = '';
+    updateClearClubsButtonState();
     if (chart) {
       chart.destroy();
       chart = null;
@@ -720,6 +806,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (inactiveCapBtn) {
+    inactiveCapBtn.addEventListener('click', () => {
+      capInactivePlayers();
+    });
+  }
+
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', () => {
+      resetFilters();
+    });
+  }
+
+  if (clearClubsBtn) {
+    clearClubsBtn.addEventListener('click', () => {
+      clearClubSelections();
+    });
+  }
+
   searchEl.addEventListener('focus', () => renderDropdown(searchEl.value));
   searchEl.addEventListener('input', () => renderDropdown(searchEl.value));
   searchEl.addEventListener('blur', () => setTimeout(() => dropEl.classList.remove('open'), 150));
@@ -750,10 +854,15 @@ document.addEventListener('DOMContentLoaded', () => {
     refresh();
   });
 
+  document.getElementById('hcMin').addEventListener('keydown', stepRangeInputByInteger);
+
   document.getElementById('hcMax').addEventListener('change', () => {
     clampInputs();
+    updateInactiveCapButtonLabel();
     refresh();
   });
+
+  document.getElementById('hcMax').addEventListener('keydown', stepRangeInputByInteger);
 
   // Keep canvas in sync when container size changes without a window resize event.
   const chartWrapper = document.querySelector('.chart-wrapper');
@@ -765,6 +874,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   try {
+    updateInactiveCapButtonLabel();
+    updateClearClubsButtonState();
     const ts = parseInt(localStorage.getItem(CACHE_TS));
     const raw = localStorage.getItem(CACHE_KEY);
     if (raw && ts && !isNaN(ts)) {
