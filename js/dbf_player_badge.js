@@ -425,7 +425,10 @@ function render() {
   // Regression on filtered entries for slope
   let rawSlope = 0;
   if (filteredEntries.length >= 2) {
-    const pts = filteredEntries.map(e => ({ x: e.date / 86400000, y: e.hc }));
+    // Centre x-values on the first entry to avoid catastrophic floating-point
+    // cancellation when computing n·ΣXX − (ΣX)² with large epoch-day numbers.
+    const x0  = filteredEntries[0].date / 86400000;
+    const pts = filteredEntries.map(e => ({ x: e.date / 86400000 - x0, y: e.hc }));
     rawSlope = linearRegression(pts).slope;
   }
 
