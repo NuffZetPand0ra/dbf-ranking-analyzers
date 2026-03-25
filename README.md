@@ -1,60 +1,90 @@
 # dbf-ranking-analyzers
-Various analyzers for bridge ranking in the Danish Bridge Federation
 
-## Structure
-- `views/layouts/base.hbs`: Shared HTML document shell used by all rendered pages
-- `views/pages/dashboard.html`: Dashboard view body
-- `views/pages/handicap.html`: Player handicap comparison view body
-- `views/pages/handicap_histogram.html`: Handicap distribution view body
-- `views/partials/analyzer_header.hbs`: Shared Handlebars header partial for analyzer pages
-- `views/partials/footer.hbs`: Shared Handlebars footer partial
-- `.eleventy.js`: Eleventy build configuration and passthrough asset setup
-- `css/analyzer-theme.css`: Shared UI theme used by both analyzers
-- `css/dbf_handicap.css`: Page-specific styles for comparison analyzer
-- `css/dbf_handicap_histogram.css`: Page-specific styles for histogram analyzer
-- `js/dbf_handicap.js`: Script for comparison analyzer
-- `js/dbf_handicap_histogram.js`: Script for histogram analyzer
+Small web tools for exploring handicap data from Danmarks Bridgeforbund.
 
-Eleventy now builds the page layer from `views/pages/*.html` through the shared Handlebars layout, while `server.js` stays focused on the DBf relay endpoints and serving the generated `_site/` output.
+Live site:
+- `https://dbf-ranking-analyzers.onrender.com/`
 
-## Run locally
-This project uses Eleventy to build the pages and a small Node server to serve the generated site plus relay DBf requests through local API routes to avoid browser CORS issues.
+## What It Does
 
-1. Install dependencies:
-	- `npm install`
-2. Start the dashboard and Eleventy watcher:
-	- `npm run dev`
-3. Start directly on the handicap tool route:
-	- `npm run dev:handicap`
-4. Start directly on the distribution tool route:
-	- `npm run dev:histogram`
-5. Create a production build:
-	- `npm run build`
+This project provides two browser-based analyzers:
 
-By default, `npm run dev` starts on port 4173.
+1. Handicap comparison
+   Compare handicap development for multiple DBf players over time.
+
+2. Handicap distribution
+   Explore handicap distribution across clubs and inspect summary statistics.
+
+The site is built as static pages with Eleventy and uses a small Node relay for DBf requests so the browser can fetch data without CORS issues.
 
 ## Routes
-- `/`: Dashboard / landing page
-- `/tools/handicap-comparison/`: Player handicap comparison analyzer
-- `/tools/handicap-distribution/`: Handicap distribution analyzer
 
-## Local relay API
-- `GET /api/hacalle` -> fetches `https://medlemmer.bridge.dk/HACAlle.php`
-- `GET /api/lookup?dbfNr=78976` -> fetches `https://medlemmer.bridge.dk/LookUpHAC.php?DBFNr=78976`
+- `/`: Dashboard
+- `/tools/handicap-comparison/`: Player handicap comparison
+- `/tools/handicap-distribution/`: Handicap distribution by club
 
-Both frontend analyzers now use these local endpoints when you click the DBf fetch buttons.
+## How To Use
 
-## Deploy on Render (from GitHub)
-This is the easiest way to host this project publicly while keeping the relay API endpoints (`/api/hacalle` and `/api/lookup`).
+### Handicap comparison
 
-1. Push this repository to GitHub.
-2. Go to Render and choose New + -> Blueprint.
-3. Connect your GitHub account and select this repository.
-4. Render will detect `render.yaml` and create the web service automatically.
-5. Click Deploy.
+- Open `/tools/handicap-comparison/`
+- Search for a player by DBf number and fetch data from DBf
+- Compare multiple players in the same chart
+- Filter by date range and time grouping
+- Export or share the current chart view
 
-Notes:
-- `render.yaml` sets `HOST=0.0.0.0` so the service is reachable on Render.
-- `render.yaml` runs `npm run build` before starting the relay/static server.
-- Render injects `PORT` automatically, and `server.js` already uses it.
-- The homepage is `/`, backed by the Eleventy-generated dashboard page.
+### Handicap distribution
+
+- Open `/tools/handicap-distribution/`
+- Fetch the latest `HACAlle` data from DBf
+- Filter by club and handicap interval
+- Adjust the number of bins in the histogram
+- Switch between count, percentage, cumulative curve, and trendline views
+
+## Run Locally
+
+Requirements:
+- Node.js
+- npm
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the full local dev setup:
+
+```bash
+npm run dev
+```
+
+Useful dev commands:
+
+- `npm run dev`: dashboard on port `4173`
+- `npm run dev:handicap`: opens on the handicap comparison route on port `4174`
+- `npm run dev:histogram`: opens on the distribution route on port `4175`
+- `npm run build`: build the static site into `_site/`
+- `npm run preview`: build first, then serve the production output locally
+
+## Data Access
+
+The frontend uses local relay endpoints exposed by the Node server:
+
+- `GET /api/hacalle`
+- `GET /api/lookup?dbfNr=78976`
+
+These endpoints proxy DBf sources so the tools can fetch data from the browser without cross-origin issues.
+
+## Deploy
+
+The repository includes a Render blueprint in `render.yaml`.
+
+Deploy flow:
+
+1. Push the repository to GitHub
+2. Create a new Render Blueprint service
+3. Connect the repository
+4. Deploy
+
+Render runs `npm install && npm run build` and then starts `server.js` to serve the generated site and relay API.

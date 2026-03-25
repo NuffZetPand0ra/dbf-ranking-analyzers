@@ -1,4 +1,4 @@
-Contact: mailto:security@example.com
+Contact: https://github.com/NuffZetPand0ra/dbf-ranking-analyzers/issues
 Expires: 2026-12-24T00:00:00Z
 Preferred-Languages: da, en
-Canonical: https://your-domain.com/.well-known/security.txt
+Canonical: https://dbf-ranking-analyzers.onrender.com/.well-known/security.txt
