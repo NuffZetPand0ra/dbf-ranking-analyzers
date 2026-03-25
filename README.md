@@ -2,8 +2,10 @@
 Various analyzers for bridge ranking in the Danish Bridge Federation
 
 ## Structure
-- `dbf_handicap.html`: Player handicap comparison analyzer
-- `dbf_handicap_histogram.html`: Handicap distribution analyzer
+- `views/layouts/base.hbs`: Shared HTML document shell used by all rendered pages
+- `views/pages/dashboard.hbs`: Dashboard view body
+- `views/pages/handicap.hbs`: Player handicap comparison view body
+- `views/pages/handicap_histogram.hbs`: Handicap distribution view body
 - `views/partials/analyzer_header.hbs`: Shared Handlebars header partial for analyzer pages
 - `views/partials/footer.hbs`: Shared Handlebars footer partial
 - `css/analyzer-theme.css`: Shared UI theme used by both analyzers
@@ -12,7 +14,7 @@ Various analyzers for bridge ranking in the Danish Bridge Federation
 - `js/dbf_handicap.js`: Script for comparison analyzer
 - `js/dbf_handicap_histogram.js`: Script for histogram analyzer
 
-The three `.html` pages are now rendered server-side as Handlebars templates so shared partials can be reused while keeping the same public URLs.
+The `.html` routes are rendered server-side from `views/pages/*.hbs` through a shared Handlebars layout, so the public URLs stay the same while the HTML shell is centralized.
 
 ## Run locally
 This project uses a small Node server that serves the pages and relays DBf requests through local API routes to avoid browser CORS issues.

@@ -1,28 +1,3 @@
-<!DOCTYPE html>
-<html lang="da">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Uofficielle analyseværktøjer til Danmarks Bridgeforbund handicapdata. Alt behandles lokalt i din browser.">
-<meta name="theme-color" content="#0f766e">
-<meta name="color-scheme" content="light dark">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="HandicapAnalyzere">
-<link rel="icon" type="image/svg+xml" href="./favicon.svg">
-<link rel="apple-touch-icon" href="./favicon.svg">
-<link rel="manifest" href="./manifest.json">
-<meta property="og:title" content="DBf Analysevæktøjer">
-<meta property="og:description" content="Uofficielle analyseværktøjer til Danmarks Bridgeforbund handicapdata. Alt behandles lokalt i din browser.">
-<meta property="og:type" content="website">
-<meta property="og:locale" content="da_DK">
-<meta property="og:image" content="./favicon.svg"><link rel="sitemap" href="./sitemap.xml" type="application/xml"><title>DBf Analyseværktøjer</title>
-<link rel="stylesheet" href="./css/analyzer-theme.css">
-<link rel="stylesheet" href="./css/dbf_dashboard.css">
-<script>if(localStorage.getItem('dbf_theme')!=='light')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','light');</script>
-</head>
-<body>
-
 <div class="portal">
 
   <div class="portal-nav">
@@ -38,48 +13,37 @@
 
   <section class="tool-grid" aria-label="Tilgængelige analyseværktøjer">
 
-    <!-- ── Tool 1: Sammenligning ───────────────────────────────── -->
     <article class="tool-card">
       <div class="tool-screen" aria-hidden="true">
         <svg class="preview-svg" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Linjediagram med tre spilleres handicapudvikling">
-          <!-- grid -->
           <line x1="20" y1="22" x2="265" y2="22" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="20" y1="52" x2="265" y2="52" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="20" y1="82" x2="265" y2="82" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="20" y1="112" x2="265" y2="112" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-          <!-- player 1 area fill (teal, improving) -->
           <path d="M 20,88 C 38,88 54,80 76,80 C 98,80 114,72 136,72 C 158,72 174,62 196,62 C 216,62 232,52 252,44 L 252,112 L 20,112 Z"
                 fill="url(#fillTeal)" opacity="0.18"/>
-          <!-- player 1 line -->
           <path d="M 20,88 C 38,88 54,80 76,80 C 98,80 114,72 136,72 C 158,72 174,62 196,62 C 216,62 232,52 252,44"
                 fill="none" stroke="#14b8a6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- player 2 area fill (amber, slight rise) -->
           <path d="M 20,65 C 38,65 54,72 76,72 C 98,72 114,68 136,76 C 158,76 174,70 196,78 C 216,78 232,72 252,80 L 252,112 L 20,112 Z"
                 fill="url(#fillAmber)" opacity="0.12"/>
-          <!-- player 2 line -->
           <path d="M 20,65 C 38,65 54,72 76,72 C 98,72 114,68 136,76 C 158,76 174,70 196,78 C 216,78 232,72 252,80"
                 fill="none" stroke="#f59e0b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <!-- player 3 line (blue, stable) -->
           <path d="M 20,104 C 38,104 54,100 76,98 C 98,98 114,102 136,99 C 158,99 174,102 196,97 C 216,97 232,100 252,96"
                 fill="none" stroke="#60a5fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 3"/>
-          <!-- dots: player 1 -->
-          <circle cx="20"  cy="88" r="3" fill="#14b8a6"/>
-          <circle cx="76"  cy="80" r="3" fill="#14b8a6"/>
+          <circle cx="20" cy="88" r="3" fill="#14b8a6"/>
+          <circle cx="76" cy="80" r="3" fill="#14b8a6"/>
           <circle cx="136" cy="72" r="3" fill="#14b8a6"/>
           <circle cx="196" cy="62" r="3" fill="#14b8a6"/>
           <circle cx="252" cy="44" r="3" fill="#14b8a6"/>
-          <!-- dots: player 2 -->
-          <circle cx="20"  cy="65" r="3" fill="#f59e0b"/>
-          <circle cx="76"  cy="72" r="3" fill="#f59e0b"/>
+          <circle cx="20" cy="65" r="3" fill="#f59e0b"/>
+          <circle cx="76" cy="72" r="3" fill="#f59e0b"/>
           <circle cx="136" cy="76" r="3" fill="#f59e0b"/>
           <circle cx="252" cy="80" r="3" fill="#f59e0b"/>
-          <!-- axis labels -->
-          <text x="20"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jan</text>
-          <text x="70"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">apr</text>
+          <text x="20" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jan</text>
+          <text x="70" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">apr</text>
           <text x="124" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jul</text>
           <text x="178" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">okt</text>
           <text x="232" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">jan</text>
-          <!-- legend dots -->
           <circle cx="20" cy="14" r="3.5" fill="#14b8a6"/>
           <text x="27" y="17" font-family="IBM Plex Mono,monospace" font-size="7.5" fill="rgba(255,255,255,0.45)">A. Hansen</text>
           <circle cx="90" cy="14" r="3.5" fill="#f59e0b"/>
@@ -124,37 +88,30 @@
       </div>
     </article>
 
-    <!-- ── Tool 2: Fordeling ───────────────────────────────────── -->
     <article class="tool-card">
       <div class="tool-screen" aria-hidden="true">
         <svg class="preview-svg" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Histogram over handicapfordeling">
-          <!-- grid lines -->
           <line x1="18" y1="20" x2="265" y2="20" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="18" y1="50" x2="265" y2="50" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="18" y1="80" x2="265" y2="80" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
           <line x1="18" y1="110" x2="265" y2="110" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-          <!-- bars (bell-ish, slightly right-skewed) -->
-          <rect x="20"  y="100" width="22" height="10"  rx="2" fill="#14b8a6" opacity="0.55"/>
-          <rect x="46"  y="84"  width="22" height="26"  rx="2" fill="#14b8a6" opacity="0.62"/>
-          <rect x="72"  y="63"  width="22" height="47"  rx="2" fill="#14b8a6" opacity="0.70"/>
-          <rect x="98"  y="38"  width="22" height="72"  rx="2" fill="#14b8a6" opacity="0.78"/>
-          <rect x="124" y="20"  width="22" height="90"  rx="2" fill="#14b8a6" opacity="0.90"/>
-          <rect x="150" y="30"  width="22" height="80"  rx="2" fill="#14b8a6" opacity="0.85"/>
-          <rect x="176" y="52"  width="22" height="58"  rx="2" fill="#14b8a6" opacity="0.75"/>
-          <rect x="202" y="72"  width="22" height="38"  rx="2" fill="#14b8a6" opacity="0.65"/>
-          <rect x="228" y="90"  width="22" height="20"  rx="2" fill="#14b8a6" opacity="0.58"/>
-          <!-- distribution curve overlay -->
+          <rect x="20" y="100" width="22" height="10" rx="2" fill="#14b8a6" opacity="0.55"/>
+          <rect x="46" y="84" width="22" height="26" rx="2" fill="#14b8a6" opacity="0.62"/>
+          <rect x="72" y="63" width="22" height="47" rx="2" fill="#14b8a6" opacity="0.70"/>
+          <rect x="98" y="38" width="22" height="72" rx="2" fill="#14b8a6" opacity="0.78"/>
+          <rect x="124" y="20" width="22" height="90" rx="2" fill="#14b8a6" opacity="0.90"/>
+          <rect x="150" y="30" width="22" height="80" rx="2" fill="#14b8a6" opacity="0.85"/>
+          <rect x="176" y="52" width="22" height="58" rx="2" fill="#14b8a6" opacity="0.75"/>
+          <rect x="202" y="72" width="22" height="38" rx="2" fill="#14b8a6" opacity="0.65"/>
+          <rect x="228" y="90" width="22" height="20" rx="2" fill="#14b8a6" opacity="0.58"/>
           <path d="M 20,108 C 35,105 45,88 57,78 C 72,64 90,42 109,26 C 126,12 140,12 159,22 C 178,34 196,56 213,74 C 228,90 242,102 252,108"
                 fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-          <!-- active club selection highlight on bar 5 -->
           <rect x="124" y="20" width="22" height="90" rx="2" fill="none" stroke="#2dd4bf" stroke-width="1.5" opacity="0.8"/>
-          <!-- axis labels -->
-          <text x="20"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">-10</text>
-          <text x="72"  y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">20</text>
+          <text x="20" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">-10</text>
+          <text x="72" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">20</text>
           <text x="124" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">50</text>
           <text x="176" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">80</text>
           <text x="228" y="124" font-family="IBM Plex Mono,monospace" font-size="8" fill="rgba(255,255,255,0.28)">110</text>
-          <!-- stats callout -->
           <rect x="188" y="16" width="72" height="36" rx="5" fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.3)" stroke-width="1"/>
           <text x="196" y="28" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.5)">median</text>
           <text x="196" y="40" font-family="IBM Plex Mono,monospace" font-size="11" font-weight="600" fill="#2dd4bf">47.2</text>
@@ -187,12 +144,8 @@
       </div>
     </article>
 
-  </section><!-- /.tool-grid -->
+  </section>
 
   {{> footer wrapperClass="portal-footer"}}
 
-</div><!-- /.portal -->
-
-<script src="./js/theme.js"></script>
-</body>
-</html>
+</div>

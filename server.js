@@ -9,12 +9,40 @@ const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = process.cwd();
 const DEFAULT_PAGE = process.env.OPEN_PAGE || 'dbf_dashboard.html';
+const LAYOUTS_DIR = path.join(ROOT, 'views', 'layouts');
+const PAGES_DIR = path.join(ROOT, 'views', 'pages');
 const PARTIALS_DIR = path.join(ROOT, 'views', 'partials');
 
-const TEMPLATE_ROUTES = new Map([
-  ['/dbf_dashboard.html', 'dbf_dashboard.html'],
-  ['/dbf_handicap.html', 'dbf_handicap.html'],
-  ['/dbf_handicap_histogram.html', 'dbf_handicap_histogram.html']
+const VIEW_ROUTES = new Map([
+  ['/dbf_dashboard.html', {
+    page: 'dashboard',
+    title: 'DBf Analyseværktøjer',
+    ogTitle: 'DBf Analysevæktøjer',
+    description: 'Uofficielle analyseværktøjer til Danmarks Bridgeforbund handicapdata. Alt behandles lokalt i din browser.',
+    appleTitle: 'HandicapAnalyzere',
+    stylesheets: ['./css/analyzer-theme.css', './css/dbf_dashboard.css'],
+    bodyScripts: ['./js/theme.js']
+  }],
+  ['/dbf_handicap.html', {
+    page: 'handicap',
+    title: 'DBf Handicap Sammenligning',
+    ogTitle: 'DBf Handicap Sammenligning',
+    description: 'Analyser og sammenlign handicap-udvikling for flere DBf-spillere. Alle data behandles lokalt i din browser.',
+    appleTitle: 'Handicap Sammenligning',
+    headScripts: ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'],
+    stylesheets: ['./css/analyzer-theme.css', './css/dbf_handicap.css'],
+    bodyScripts: ['./js/utils.js', './js/dbf_handicap.js', './js/theme.js']
+  }],
+  ['/dbf_handicap_histogram.html', {
+    page: 'handicap_histogram',
+    title: 'DBf Handicap Fordeling',
+    ogTitle: 'DBf Handicap Fordeling',
+    description: 'Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.',
+    appleTitle: 'Handicap Fordeling',
+    headScripts: ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'],
+    stylesheets: ['./css/analyzer-theme.css', './css/dbf_handicap_histogram.css'],
+    bodyScripts: ['./js/utils.js', './js/dbf_handicap_histogram.js', './js/theme.js']
+  }]
 ]);
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
@@ -59,23 +87,38 @@ async function loadPartials(handlebars) {
   }));
 }
 
-async function renderTemplate(templateFile, templateData) {
-  const templatePath = path.join(ROOT, templateFile);
-  if (!isSafePath(templatePath)) {
+async function readSafeFile(filePath) {
+  if (!isSafePath(filePath)) {
     throw new Error('Forbidden template path');
   }
 
+  return fsp.readFile(filePath, 'utf8');
+}
+
+async function renderView(viewConfig) {
   const handlebars = Handlebars.create();
   await loadPartials(handlebars);
 
-  const templateSource = await fsp.readFile(templatePath, 'utf8');
-  const template = handlebars.compile(templateSource);
-  return template(templateData);
+  const pagePath = path.join(PAGES_DIR, `${viewConfig.page}.hbs`);
+  const layoutPath = path.join(LAYOUTS_DIR, 'base.hbs');
+
+  const pageTemplate = handlebars.compile(await readSafeFile(pagePath));
+  const layoutTemplate = handlebars.compile(await readSafeFile(layoutPath));
+  const body = pageTemplate(viewConfig);
+
+  return layoutTemplate({
+    lang: 'da',
+    headScripts: [],
+    stylesheets: [],
+    bodyScripts: [],
+    ...viewConfig,
+    body
+  });
 }
 
-async function serveTemplate(templateFile, res, templateData = {}) {
+async function serveView(viewConfig, res) {
   try {
-    const html = await renderTemplate(templateFile, templateData);
+    const html = await renderView(viewConfig);
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-cache'
@@ -83,9 +126,8 @@ async function serveTemplate(templateFile, res, templateData = {}) {
     res.end(html);
   } catch (err) {
     sendJson(res, 500, {
-      error: 'Template render failed',
-      message: err.message,
-      templateFile
+      error: 'View render failed',
+      message: err.message
     });
   }
 }
@@ -96,8 +138,8 @@ async function serveStatic(reqUrl, res) {
     pathname = '/' + DEFAULT_PAGE;
   }
 
-  if (TEMPLATE_ROUTES.has(pathname)) {
-    await serveTemplate(TEMPLATE_ROUTES.get(pathname), res);
+  if (VIEW_ROUTES.has(pathname)) {
+    await serveView(VIEW_ROUTES.get(pathname), res);
     return;
   }
 
