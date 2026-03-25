@@ -28,9 +28,11 @@ header p { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-si
   box-shadow: var(--shadow);
 }
 #clubDropdown.open { display: block; }
-.dropdown-item { padding: 0.5rem 0.8rem; cursor: pointer; font-size: 0.88rem; display: flex; justify-content: space-between; align-items: center; }
-.dropdown-item:hover { background: var(--surface-muted); }
-.dropdown-item .count { font-family: 'IBM Plex Mono', monospace; font-size: 0.73rem; color: var(--muted); margin-left: 0.5rem; }
+.dropdown-item { padding: 6px 8px; cursor: pointer; font-size: 11px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover, .dropdown-item-active { background: var(--surface-muted); }
+.dropdown-item-name { font-weight: 600; color: var(--text); }
+.dropdown-item .count { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-left: 0.5rem; }
 
 .bins-control { display: flex; align-items: center; gap: 0.7rem; }
 #binSlider { width: 170px; accent-color: var(--accent); }

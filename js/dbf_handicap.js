@@ -222,6 +222,8 @@ async function addPlayerFromDbfNumber() {
 
   try {
     await addPlayerByDbfNr(dbfNr, { showUi: true, selectInput: true });
+    dbfNumberInput.value = '';
+    autocompleteDropdown.style.display = 'none';
   } catch (err) {
     setFetchPlayerStatus('Kunne ikke hente spiller', 'err');
     alert('Kunne ikke hente DBf data: ' + err.message + '\n\nDu kan stadig uploade den gemte HTML-fil manuelt.');

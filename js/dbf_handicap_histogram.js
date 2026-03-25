@@ -1,6 +1,7 @@
 const CLUB_DATA = {};
 const CLUB_NAMES = [];
 const ALL_VALUES = [];
+let dropIndex = -1;
 
 const CACHE_KEY = 'dbf_hac_data';
 const CACHE_TS = 'dbf_hac_ts';
@@ -649,32 +650,40 @@ function renderChart(vals) {
 function renderDropdown(q) {
   const filt = q ? CLUB_NAMES.filter(c => c.toLowerCase().includes(q.toLowerCase())) : CLUB_NAMES;
   dropEl.innerHTML = '';
+  dropIndex = -1;
+
   const allDiv = document.createElement('div');
   allDiv.className = 'dropdown-item';
+  allDiv.dataset.club = '';
   const allChecked = selectedClubs.length === 0 ? '✓ ' : '';
-  allDiv.innerHTML = '<span><strong>' + allChecked + 'Alle klubber</strong></span><span class="count">' + ALL_VALUES.length.toLocaleString('da-DK') + '</span>';
-  allDiv.addEventListener('mousedown', e => {
-    e.preventDefault();
-    selectClub(null);
-  });
+  allDiv.innerHTML = '<span class="dropdown-item-name"><strong>' + allChecked + 'Alle klubber</strong></span><span class="count">' + ALL_VALUES.length.toLocaleString('da-DK') + '</span>';
+  allDiv.addEventListener('mousedown', e => { e.preventDefault(); selectClub(null); });
   dropEl.appendChild(allDiv);
+
   filt.slice(0, 100).forEach(club => {
     const d = document.createElement('div');
     d.className = 'dropdown-item';
+    d.dataset.club = club;
     const nameSpan = document.createElement('span');
+    nameSpan.className = 'dropdown-item-name';
     if (selectedClubs.includes(club)) nameSpan.appendChild(document.createTextNode('\u2713 '));
     nameSpan.appendChild(document.createTextNode(club));
     const countSpan = document.createElement('span');
     countSpan.className = 'count';
     countSpan.textContent = CLUB_DATA[club].length;
     d.append(nameSpan, countSpan);
-    d.addEventListener('mousedown', e => {
-      e.preventDefault();
-      selectClub(club);
-    });
+    d.addEventListener('mousedown', e => { e.preventDefault(); selectClub(club); });
     dropEl.appendChild(d);
   });
   dropEl.classList.add('open');
+}
+
+function moveDropIndex(delta) {
+  const items = dropEl.querySelectorAll('.dropdown-item');
+  if (!items.length) return;
+  dropIndex = Math.max(0, Math.min(dropIndex + delta, items.length - 1));
+  items.forEach((el, i) => el.classList.toggle('dropdown-item-active', i === dropIndex));
+  items[dropIndex]?.scrollIntoView({ block: 'nearest' });
 }
 
 function getCurrentVals() {
@@ -853,7 +862,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   searchEl.addEventListener('focus', () => renderDropdown(searchEl.value));
   searchEl.addEventListener('input', () => renderDropdown(searchEl.value));
-  searchEl.addEventListener('blur', () => setTimeout(() => dropEl.classList.remove('open'), 150));
+  searchEl.addEventListener('blur', () => { dropEl.classList.remove('open'); dropIndex = -1; });
+  dropEl.addEventListener('mousedown', e => e.preventDefault());
+
+  searchEl.addEventListener('keydown', e => {
+    const isOpen = dropEl.classList.contains('open');
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (!isOpen) renderDropdown(searchEl.value); moveDropIndex(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (isOpen) moveDropIndex(-1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isOpen && dropIndex >= 0) {
+        const active = dropEl.querySelectorAll('.dropdown-item')[dropIndex];
+        if (active) selectClub(active.dataset.club === '' ? null : active.dataset.club);
+      }
+    }
+    else if (e.key === 'Escape') { dropEl.classList.remove('open'); dropIndex = -1; }
+  });
 
   document.getElementById('binSlider').addEventListener('input', function() {
     numBins = parseInt(this.value);
