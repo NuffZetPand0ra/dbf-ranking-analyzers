@@ -1,5 +1,8 @@
 const COLORS = ['#378ADD', '#1D9E75', '#D85A30', '#D4537E', '#7F77DD', '#BA7517', '#639922', '#E24B4A', '#888780'];
+const GROUP_COLORS = ['#FF9500', '#34C759', '#AF52DE', '#FF2D55', '#5AC8FA', '#FFCC00', '#00C7BE', '#FF6B35'];
 const players = [];
+const groups = [];
+let nextGroupId = 1;
 const hiddenPlayers = new Set();
 let chart = null;
 let showPoints = true;
@@ -45,6 +48,87 @@ function setFetchPlayerStatus(msg, type) {
 function normalizeDbfNr(value) {
   return String(value || '').replace(/\D/g, '');
 }
+
+// ── Group management ──────────────────────────────────────────────────────────
+
+function createGroup(name) {
+  const color = GROUP_COLORS[groups.length % GROUP_COLORS.length];
+  const g = { id: nextGroupId++, name, color, memberDbfNrs: new Set() };
+  groups.push(g);
+  return g;
+}
+
+function deleteGroup(groupId) {
+  const idx = groups.findIndex(g => g.id === groupId);
+  if (idx < 0) return;
+  groups.splice(idx, 1);
+  rebuildPills();
+  render();
+}
+
+function setPlayerGroup(dbfNr, groupId) {
+  for (const g of groups) g.memberDbfNrs.delete(dbfNr);
+  if (groupId !== null) {
+    const g = groups.find(g => g.id === groupId);
+    if (g) g.memberDbfNrs.add(dbfNr);
+  }
+  rebuildPills();
+  render();
+}
+
+function getPlayerGroup(dbfNr) {
+  return groups.find(g => g.memberDbfNrs.has(dbfNr)) || null;
+}
+
+function promptCreateGroup() {
+  // Prevent duplicate inline forms
+  if (pillRowEl.querySelector('.group-create-form')) return;
+
+  const form = document.createElement('span');
+  form.className = 'group-create-form';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'group-create-input';
+  input.placeholder = 'Gruppenavn';
+  input.value = 'Gruppe ' + (groups.length + 1);
+
+  const doCreate = () => {
+    const name = input.value.trim();
+    if (name) createGroup(name);
+    rebuildPills();
+    if (name) render();
+  };
+  const doCancel = () => rebuildPills();
+
+  const saveBtn = document.createElement('span');
+  saveBtn.className = 'add-btn';
+  saveBtn.textContent = '✓';
+  saveBtn.addEventListener('click', doCreate);
+
+  const cancelBtn = document.createElement('span');
+  cancelBtn.className = 'clear-btn';
+  cancelBtn.textContent = '✕';
+  cancelBtn.addEventListener('click', doCancel);
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doCreate();
+    if (e.key === 'Escape') doCancel();
+  });
+
+  form.append(input, saveBtn, cancelBtn);
+
+  // Swap the "+ Ny gruppe" button out for the inline form
+  const newGrpBtn = Array.from(pillRowEl.querySelectorAll('.add-btn'))
+    .find(b => b.textContent === '+ Ny gruppe');
+  if (newGrpBtn) pillRowEl.replaceChild(form, newGrpBtn);
+  else pillRowEl.appendChild(form);
+
+  input.focus();
+  input.select();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function getLookupCacheKey(dbfNr) {
   return LOOKUP_CACHE_PREFIX + dbfNr;
@@ -260,6 +344,54 @@ function buildDs(player, labels, gran) {
   });
 }
 
+function buildGroupDs(group, labels, gran) {
+  const f = getFrom();
+  const t = getTo();
+  const memberPlayers = players.filter(p => group.memberDbfNrs.has(p.dbfNr));
+  if (!memberPlayers.length) return labels.map(() => null);
+
+  if (gran === 'all') {
+    // Carry-forward: at each date point use each member's most-recent HC
+    return labels.map(dateStr => {
+      const d = new Date(dateStr + 'T23:59:59');
+      const vals = [];
+      for (const p of memberPlayers) {
+        let lastHc = null;
+        for (const e of p.entries) {
+          if (f && e.date < f) continue;
+          if (e.date <= d) lastHc = e.hc;
+        }
+        if (lastHc !== null) vals.push(lastHc);
+      }
+      if (!vals.length) return null;
+      return parseFloat((vals.reduce((a, c) => a + c, 0) / vals.length).toFixed(2));
+    });
+  }
+
+  // Bucketed granularities: average of each member's bucket average
+  const memberBuckets = memberPlayers.map(p => {
+    const b = {};
+    for (const e of p.entries) {
+      if (f && e.date < f) continue;
+      if (t && e.date > t) continue;
+      const k = bucketKey(e.date, gran);
+      (b[k] = b[k] || []).push(e.hc);
+    }
+    return b;
+  });
+
+  return labels.map(k => {
+    const vals = [];
+    for (const b of memberBuckets) {
+      if (b[k]) {
+        vals.push(b[k].reduce((a, c) => a + c, 0) / b[k].length);
+      }
+    }
+    if (!vals.length) return null;
+    return parseFloat((vals.reduce((a, c) => a + c, 0) / vals.length).toFixed(2));
+  });
+}
+
 function updateDateRange() {
   let mn = null;
   let mx = null;
@@ -285,6 +417,8 @@ function togglePlayerVisibility(i) {
 
 function deleteAllPlayers() {
   players.length = 0;
+  groups.length = 0;
+  nextGroupId = 1;
   hiddenPlayers.clear();
   dbfNumberInput.value = '';
   setFetchPlayerStatus('', '');
@@ -294,26 +428,54 @@ function deleteAllPlayers() {
 
 function rebuildPills() {
   pillRowEl.innerHTML = '';
+
+  // ── Player pills ────────────────────────────────────────────────────────────
   players.forEach((p, i) => {
+    const playerGroup = getPlayerGroup(p.dbfNr);
+    const playerColor = COLORS[i % COLORS.length];
+    const isHidden = hiddenPlayers.has(i);
+
     const pill = document.createElement('span');
     pill.className = 'pill';
-    const isHidden = hiddenPlayers.has(i);
-    pill.style.borderColor = COLORS[i % COLORS.length];
+    pill.style.borderColor = playerGroup ? playerGroup.color : playerColor;
     pill.style.opacity = isHidden ? '0.4' : '1';
     pill.style.cursor = 'pointer';
     pill.style.transition = 'opacity 0.2s';
 
     const dot = document.createElement('span');
-    dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${COLORS[i % COLORS.length]};display:inline-block`;
+    dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${playerColor};display:inline-block;flex-shrink:0`;
 
     const txt = document.createElement('span');
     txt.textContent = p.dbfNr ? `${p.name} (#${p.dbfNr})` : p.name;
+
+    // Group selector
+    const groupSel = document.createElement('select');
+    groupSel.className = 'pill-group-select';
+    groupSel.title = 'Tildel gruppe';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '–';
+    groupSel.appendChild(noneOpt);
+    for (const g of groups) {
+      const opt = document.createElement('option');
+      opt.value = String(g.id);
+      opt.textContent = g.name;
+      if (playerGroup && playerGroup.id === g.id) opt.selected = true;
+      groupSel.appendChild(opt);
+    }
+    if (playerGroup) groupSel.style.background = playerGroup.color + '55';
+    groupSel.addEventListener('change', e => {
+      e.stopPropagation();
+      setPlayerGroup(p.dbfNr, e.target.value ? parseInt(e.target.value, 10) : null);
+    });
+    groupSel.addEventListener('click', e => e.stopPropagation());
 
     const btn = document.createElement('button');
     btn.textContent = '×';
     btn.title = 'Fjern';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      for (const g of groups) g.memberDbfNrs.delete(p.dbfNr);
       players.splice(i, 1);
       const shifted = new Set();
       for (const idx of hiddenPlayers) {
@@ -326,15 +488,48 @@ function rebuildPills() {
       render();
     });
 
-    pill.append(dot, txt, btn);
+    pill.append(dot, txt, groupSel, btn);
     pill.addEventListener('click', () => togglePlayerVisibility(i));
     pillRowEl.appendChild(pill);
   });
-  
+
+  // ── Group pills ─────────────────────────────────────────────────────────────
+  for (const g of groups) {
+    const memberCount = players.filter(p => g.memberDbfNrs.has(p.dbfNr)).length;
+
+    const pill = document.createElement('span');
+    pill.className = 'pill pill-group';
+    pill.style.borderColor = g.color;
+
+    const dot = document.createElement('span');
+    dot.style.cssText = `width:8px;height:8px;border-radius:2px;background:${g.color};display:inline-block;flex-shrink:0`;
+
+    const txt = document.createElement('span');
+    txt.textContent = `${g.name} (${memberCount})`;
+
+    const btn = document.createElement('button');
+    btn.textContent = '×';
+    btn.title = 'Slet gruppe';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteGroup(g.id);
+    });
+
+    pill.append(dot, txt, btn);
+    pillRowEl.appendChild(pill);
+  }
+
+  // ── Action buttons ──────────────────────────────────────────────────────────
+  const newGroupBtn = document.createElement('span');
+  newGroupBtn.className = 'add-btn';
+  newGroupBtn.textContent = '+ Ny gruppe';
+  newGroupBtn.addEventListener('click', promptCreateGroup);
+  pillRowEl.appendChild(newGroupBtn);
+
   if (players.length > 0) {
     const deleteBtn = document.createElement('span');
     deleteBtn.className = 'add-btn';
-    deleteBtn.textContent = 'Slet alle spillere';
+    deleteBtn.textContent = 'Slet alle';
     deleteBtn.addEventListener('click', deleteAllPlayers);
     pillRowEl.appendChild(deleteBtn);
   }
@@ -368,6 +563,21 @@ function render() {
     span.addEventListener('click', () => togglePlayerVisibility(i));
     legendEl.appendChild(span);
   });
+  // Group legend items
+  for (const g of groups) {
+    if (!players.some(p => g.memberDbfNrs.has(p.dbfNr))) continue;
+    const span = document.createElement('span');
+    span.className = 'legend-item legend-item-group';
+
+    const dot = document.createElement('span');
+    dot.style.cssText = `width:10px;height:4px;border-radius:1px;background:${g.color};display:inline-block;align-self:center`;
+    const label = document.createElement('span');
+    label.textContent = g.name + ' (gns.)';
+
+    span.append(dot, label);
+    legendEl.appendChild(span);
+  }
+
   statsRowEl.innerHTML = '';
   const f = getFrom();
   const t = getTo();
@@ -390,6 +600,30 @@ function render() {
     card.append(lbl, val, sub);
     statsRowEl.appendChild(card);
   }
+  // Group average stat cards
+  for (const g of groups) {
+    const memberPlayers = players.filter(p => g.memberDbfNrs.has(p.dbfNr));
+    if (!memberPlayers.length) continue;
+    const memberEntries = memberPlayers.map(p => p.entries.filter(e => (!f || e.date >= f) && (!t || e.date <= t)));
+    const lastVals = memberEntries.map(fe => fe.length ? fe[fe.length - 1].hc : null).filter(v => v !== null);
+    const bestVals = memberEntries.map(fe => fe.length ? Math.min(...fe.map(e => e.hc)) : null).filter(v => v !== null);
+    const avgLast = lastVals.length ? (lastVals.reduce((a, c) => a + c, 0) / lastVals.length).toFixed(2) : '–';
+    const avgBest = bestVals.length ? (bestVals.reduce((a, c) => a + c, 0) / bestVals.length).toFixed(2) : '–';
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.style.borderLeft = `3px dashed ${g.color}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'stat-label';
+    lbl.textContent = g.name + ' (gns.)';
+    const val = document.createElement('div');
+    val.className = 'stat-val';
+    val.textContent = avgLast;
+    const sub = document.createElement('div');
+    sub.className = 'stat-sub';
+    sub.textContent = 'Bedste gns.: ' + avgBest;
+    card.append(lbl, val, sub);
+    statsRowEl.appendChild(card);
+  }
 
   if (!players.length) {
     if (chart) {
@@ -400,7 +634,7 @@ function render() {
     return;
   }
 
-  const datasets = visiblePlayers.map(({ p, i }) => ({
+  const playerDatasets = visiblePlayers.map(({ p, i }) => ({
     label: p.name,
     data: buildDs(p, labels, gran),
     borderColor: COLORS[i % COLORS.length],
@@ -413,6 +647,25 @@ function render() {
     fill: false,
     spanGaps: true
   }));
+
+  const groupDatasets = groups
+    .filter(g => players.some(p => g.memberDbfNrs.has(p.dbfNr)))
+    .map(g => ({
+      label: g.name + ' (gns.)',
+      data: buildGroupDs(g, labels, gran),
+      borderColor: g.color,
+      backgroundColor: g.color + '22',
+      borderWidth: 2.5,
+      borderDash: [7, 4],
+      pointRadius: r,
+      pointHoverRadius: showPoints ? 5 : 0,
+      pointHitRadius: showPoints ? 6 : 0,
+      tension,
+      fill: false,
+      spanGaps: true
+    }));
+
+  const datasets = [...playerDatasets, ...groupDatasets];
   const cl = labels.map(k => bucketLabel(k, gran));
 
   if (chart) {
@@ -540,6 +793,14 @@ function buildStateParams(includeEndDate) {
     .map((p, i) => (hiddenPlayers.has(i) ? p.dbfNr : null))
     .filter(Boolean);
   if (hiddenDbf.length) params.set('h', hiddenDbf.join('-'));
+
+  if (groups.length) {
+    const grpStr = groups
+      .map(g => encodeURIComponent(g.name) + ':' + Array.from(g.memberDbfNrs).join(','))
+      .join('|');
+    params.set('grp', grpStr);
+  }
+
   return params;
 }
 
@@ -660,6 +921,19 @@ async function restoreStateFromUrl() {
         try {
           await addPlayerByDbfNr(dbfNr, { showUi: false, skipRender: true });
         } catch (_) {}
+      }
+    }
+
+    const grpParam = params.get('grp');
+    if (grpParam) {
+      for (const part of grpParam.split('|')) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx < 0) continue;
+        const name = decodeURIComponent(part.slice(0, colonIdx));
+        const memberNrs = part.slice(colonIdx + 1).split(',').map(normalizeDbfNr).filter(Boolean);
+        if (!name) continue;
+        const g = createGroup(name);
+        for (const nr of memberNrs) g.memberDbfNrs.add(nr);
       }
     }
 
@@ -838,6 +1112,7 @@ if (includeEndDateEl) {
   includeEndDateEl.checked = new URLSearchParams(window.location.search).has('to');
 }
 
+rebuildPills();
 restoreStateFromUrl().finally(() => {
   fetchAllPlayers();
 });
