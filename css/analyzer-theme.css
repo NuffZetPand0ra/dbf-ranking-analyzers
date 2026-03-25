@@ -169,6 +169,17 @@ select {
   line-height: 1.65;
 }
 
+.shared-footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem 1.25rem;
+}
+
+.shared-footer-meta p {
+  flex: 1 1 18rem;
+}
+
 .shared-footer strong {
   color: var(--text);
   font-weight: 700;
@@ -318,5 +329,9 @@ select {
   .page { padding: 0.75rem; border-radius: 14px; }
   .shared-footer {
     padding: 0.9rem 0.95rem;
+  }
+  .shared-footer-meta {
+    display: grid;
+    gap: 0.45rem;
   }
 }
