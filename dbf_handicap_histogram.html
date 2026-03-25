@@ -27,19 +27,7 @@
 <body>
 <main class="page">
 <header>
-  <div class="header-title-row">
-    <div>
-      <h1>DBf Handicap Fordeling</h1>
-      <p id="headerDesc">Danmarks Bridgeforbund</p>
-    </div>
-    <div class="header-tools">
-      <a href="./dbf_dashboard.html" class="back-link" aria-label="Til forsiden">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg>
-        Forside
-      </a>
-      <div id="theme-toggle-slot"></div>
-    </div>
-  </div>
+  {{> analyzer_header headerRowClass="header-title-row" title="DBf Handicap Fordeling" subtitle="Danmarks Bridgeforbund" subtitleId="headerDesc"}}
   <div class="update-row">
     <button class="help-btn" id="fetchRemoteBtn" type="button" title="Hent HACAlle.php direkte fra DBf">🌐 Hent fra DBf</button>
     <button class="help-btn" id="shareLinkBtn" type="button" title="Kopiér link med nuværende filtre">🔗 Del link</button>
@@ -126,6 +114,8 @@
 <div class="chart-wrapper">
   <canvas id="hChart"></canvas>
 </div>
+
+{{> footer wrapperClass="page-footer"}}
 
 </main>
 

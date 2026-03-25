@@ -26,18 +26,8 @@
 </head>
 <body>
 <main class="page">
-<header class="page-header">
-  <div>
-    <h1 class="page-title">DBf Handicap Sammenligning</h1>
-    <p class="page-subtitle">Analyser udvikling for flere spillere i samme chart.</p>
-  </div>
-  <div class="header-tools">
-    <a href="./dbf_dashboard.html" class="back-link" aria-label="Til forsiden">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg>
-      Forside
-    </a>
-    <div id="theme-toggle-slot"></div>
-  </div>
+<header>
+  {{> analyzer_header headerRowClass="page-header" title="DBf Handicap Sammenligning" titleClass="page-title" subtitle="Analyser udvikling for flere spillere i samme chart." subtitleClass="page-subtitle"}}
 </header>
 
 <div class="top-bar">
@@ -103,6 +93,8 @@
 </div>
 <div class="chart-wrap" id="chart-wrap" style="display:none"><canvas id="myChart"></canvas></div>
 <div class="stats-row" id="stats-row"></div>
+
+{{> footer wrapperClass="page-footer"}}
 
 </main>
 

@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const Handlebars = require('handlebars');
 const path = require('path');
 const { URL } = require('url');
 
@@ -8,6 +9,13 @@ const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = process.cwd();
 const DEFAULT_PAGE = process.env.OPEN_PAGE || 'dbf_dashboard.html';
+const PARTIALS_DIR = path.join(ROOT, 'views', 'partials');
+
+const TEMPLATE_ROUTES = new Map([
+  ['/dbf_dashboard.html', 'dbf_dashboard.html'],
+  ['/dbf_handicap.html', 'dbf_handicap.html'],
+  ['/dbf_handicap_histogram.html', 'dbf_handicap_histogram.html']
+]);
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
@@ -41,9 +49,57 @@ function isSafePath(candidatePath) {
   return resolved.startsWith(ROOT + path.sep) || resolved === ROOT;
 }
 
+async function loadPartials(handlebars) {
+  const entries = await fsp.readdir(PARTIALS_DIR, { withFileTypes: true });
+  await Promise.all(entries.filter((entry) => entry.isFile() && entry.name.endsWith('.hbs')).map(async (entry) => {
+    const partialName = path.basename(entry.name, '.hbs');
+    const partialPath = path.join(PARTIALS_DIR, entry.name);
+    const partialSource = await fsp.readFile(partialPath, 'utf8');
+    handlebars.registerPartial(partialName, partialSource);
+  }));
+}
+
+async function renderTemplate(templateFile, templateData) {
+  const templatePath = path.join(ROOT, templateFile);
+  if (!isSafePath(templatePath)) {
+    throw new Error('Forbidden template path');
+  }
+
+  const handlebars = Handlebars.create();
+  await loadPartials(handlebars);
+
+  const templateSource = await fsp.readFile(templatePath, 'utf8');
+  const template = handlebars.compile(templateSource);
+  return template(templateData);
+}
+
+async function serveTemplate(templateFile, res, templateData = {}) {
+  try {
+    const html = await renderTemplate(templateFile, templateData);
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache'
+    });
+    res.end(html);
+  } catch (err) {
+    sendJson(res, 500, {
+      error: 'Template render failed',
+      message: err.message,
+      templateFile
+    });
+  }
+}
+
 async function serveStatic(reqUrl, res) {
   let pathname = decodeURIComponent(reqUrl.pathname);
-  if (pathname === '/') pathname = '/' + DEFAULT_PAGE;
+  if (pathname === '/') {
+    pathname = '/' + DEFAULT_PAGE;
+  }
+
+  if (TEMPLATE_ROUTES.has(pathname)) {
+    await serveTemplate(TEMPLATE_ROUTES.get(pathname), res);
+    return;
+  }
 
   const filePath = path.join(ROOT, pathname);
   if (!isSafePath(filePath)) {

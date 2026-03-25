@@ -241,26 +241,20 @@
 
 /* ── Footer ────────────────────────────────────────────── */
 .portal-footer {
-  text-align: center;
   margin-top: 3rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
 }
 
-.portal-footer p {
+.portal-footer .shared-footer {
+  text-align: center;
+}
+
+.portal-footer .shared-footer p {
   font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.6;
 }
 
-.portal-footer a {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.portal-footer a:hover {
-  color: var(--accent-strong);
+.portal-footer .shared-footer-disclaimer {
+  margin-inline: auto;
+  max-width: 72ch;
 }
 
 /* ── Responsive ────────────────────────────────────────── */
