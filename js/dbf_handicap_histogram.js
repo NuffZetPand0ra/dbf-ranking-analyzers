@@ -445,7 +445,7 @@ function getHcRange() {
   const hi = parseFloat(document.getElementById('hcMax').value);
   return {
     lo: isNaN(lo) ? lowerBound : Math.max(lowerBound, Math.min(lo, 52)),
-    hi: isNaN(hi) ? 52 : Math.max(lowerBound, Math.min(hi, 51.99))
+    hi: isNaN(hi) ? 52 : Math.max(lowerBound, Math.min(hi, 52))
   };
 }
 
