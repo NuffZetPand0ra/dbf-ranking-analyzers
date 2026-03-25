@@ -1021,16 +1021,19 @@ if (dbfNumberInput) {
     showAutocomplete(matches);
   });
 
-  // Hide dropdown on blur
+  // Hide dropdown on blur — only if focus didn't move into the dropdown itself
   dbfNumberInput.addEventListener('blur', () => {
-    setTimeout(() => {
-      autocompleteDropdown.style.display = 'none';
-      autocompleteIndex = -1;
-    }, 150);
+    autocompleteDropdown.style.display = 'none';
+    autocompleteIndex = -1;
+  });
+
+  // Prevent mousedown on the dropdown from stealing focus (keeps blur from firing)
+  autocompleteDropdown.addEventListener('mousedown', (e) => {
+    e.preventDefault();
   });
 
   // Click on dropdown item
-  document.addEventListener('click', (e) => {
+  autocompleteDropdown.addEventListener('click', (e) => {
     const item = e.target.closest('.autocomplete-item');
     if (item) {
       const dbfNr = item.dataset.dbf;
