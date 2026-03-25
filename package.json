@@ -4,13 +4,19 @@
   "private": true,
   "description": "Static analyzers for DBF handicap views",
   "scripts": {
-    "dev": "PORT=4173 node server.js",
-    "dev:histogram": "PORT=4174 OPEN_PAGE=dbf_handicap_histogram.html node server.js",
-    "dev:dashboard": "PORT=4175 OPEN_PAGE=dbf_dashboard.html node server.js",
-    "preview": "PORT=4173 OPEN_PAGE=dbf_handicap.html node server.js"
+    "build": "eleventy",
+    "dev": "concurrently -k -n site,relay \"npm:dev:site\" \"npm:dev:relay\"",
+    "dev:site": "eleventy --watch",
+    "dev:relay": "PORT=4173 OPEN_ROUTE=/ node server.js",
+    "dev:dashboard": "npm run dev",
+    "dev:handicap": "concurrently -k -n site,relay \"npm:dev:site\" \"PORT=4174 OPEN_ROUTE=/tools/handicap-comparison/ node server.js\"",
+    "dev:histogram": "concurrently -k -n site,relay \"npm:dev:site\" \"PORT=4175 OPEN_ROUTE=/tools/handicap-distribution/ node server.js\"",
+    "preview": "npm run build && PORT=4173 OPEN_ROUTE=/ node server.js"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "@11ty/eleventy": "^3.1.5",
+    "@11ty/eleventy-plugin-handlebars": "^1.0.0",
+    "concurrently": "^9.2.1"
   },
   "dependencies": {
     "handlebars": "^4.7.8"

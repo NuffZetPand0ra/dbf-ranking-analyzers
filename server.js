@@ -1,49 +1,14 @@
 const http = require('http');
 const fs = require('fs');
 const fsp = require('fs/promises');
-const Handlebars = require('handlebars');
 const path = require('path');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
 const ROOT = process.cwd();
-const DEFAULT_PAGE = process.env.OPEN_PAGE || 'dbf_dashboard.html';
-const LAYOUTS_DIR = path.join(ROOT, 'views', 'layouts');
-const PAGES_DIR = path.join(ROOT, 'views', 'pages');
-const PARTIALS_DIR = path.join(ROOT, 'views', 'partials');
-
-const VIEW_ROUTES = new Map([
-  ['/dbf_dashboard.html', {
-    page: 'dashboard',
-    title: 'DBf Analyseværktøjer',
-    ogTitle: 'DBf Analysevæktøjer',
-    description: 'Uofficielle analyseværktøjer til Danmarks Bridgeforbund handicapdata. Alt behandles lokalt i din browser.',
-    appleTitle: 'HandicapAnalyzere',
-    stylesheets: ['./css/analyzer-theme.css', './css/dbf_dashboard.css'],
-    bodyScripts: ['./js/theme.js']
-  }],
-  ['/dbf_handicap.html', {
-    page: 'handicap',
-    title: 'DBf Handicap Sammenligning',
-    ogTitle: 'DBf Handicap Sammenligning',
-    description: 'Analyser og sammenlign handicap-udvikling for flere DBf-spillere. Alle data behandles lokalt i din browser.',
-    appleTitle: 'Handicap Sammenligning',
-    headScripts: ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'],
-    stylesheets: ['./css/analyzer-theme.css', './css/dbf_handicap.css'],
-    bodyScripts: ['./js/utils.js', './js/dbf_handicap.js', './js/theme.js']
-  }],
-  ['/dbf_handicap_histogram.html', {
-    page: 'handicap_histogram',
-    title: 'DBf Handicap Fordeling',
-    ogTitle: 'DBf Handicap Fordeling',
-    description: 'Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.',
-    appleTitle: 'Handicap Fordeling',
-    headScripts: ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'],
-    stylesheets: ['./css/analyzer-theme.css', './css/dbf_handicap_histogram.css'],
-    bodyScripts: ['./js/utils.js', './js/dbf_handicap_histogram.js', './js/theme.js']
-  }]
-]);
+const STATIC_ROOT = path.join(ROOT, '_site');
+const DEFAULT_ROUTE = process.env.OPEN_ROUTE || '/';
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
@@ -73,88 +38,55 @@ function sendJson(res, status, payload) {
 }
 
 function isSafePath(candidatePath) {
-  const resolved = path.resolve(ROOT, candidatePath);
-  return resolved.startsWith(ROOT + path.sep) || resolved === ROOT;
+  const resolved = path.resolve(STATIC_ROOT, candidatePath);
+  return resolved.startsWith(STATIC_ROOT + path.sep) || resolved === STATIC_ROOT;
 }
 
-async function loadPartials(handlebars) {
-  const entries = await fsp.readdir(PARTIALS_DIR, { withFileTypes: true });
-  await Promise.all(entries.filter((entry) => entry.isFile() && entry.name.endsWith('.hbs')).map(async (entry) => {
-    const partialName = path.basename(entry.name, '.hbs');
-    const partialPath = path.join(PARTIALS_DIR, entry.name);
-    const partialSource = await fsp.readFile(partialPath, 'utf8');
-    handlebars.registerPartial(partialName, partialSource);
-  }));
-}
+async function resolveStaticFile(pathname) {
+  const candidates = [];
 
-async function readSafeFile(filePath) {
-  if (!isSafePath(filePath)) {
-    throw new Error('Forbidden template path');
+  if (pathname === '/') {
+    candidates.push('index.html');
+  } else if (pathname.endsWith('/')) {
+    candidates.push(path.join(pathname.replace(/^\/+/, ''), 'index.html'));
+  } else {
+    const cleanPath = pathname.replace(/^\/+/, '');
+    candidates.push(cleanPath);
+    if (!path.extname(cleanPath)) {
+      candidates.push(`${cleanPath}.html`);
+      candidates.push(path.join(cleanPath, 'index.html'));
+    }
   }
 
-  return fsp.readFile(filePath, 'utf8');
-}
+  for (const candidate of candidates) {
+    const candidatePath = path.join(STATIC_ROOT, candidate);
+    if (!isSafePath(candidatePath)) {
+      continue;
+    }
 
-async function renderView(viewConfig) {
-  const handlebars = Handlebars.create();
-  await loadPartials(handlebars);
-
-  const pagePath = path.join(PAGES_DIR, `${viewConfig.page}.hbs`);
-  const layoutPath = path.join(LAYOUTS_DIR, 'base.hbs');
-
-  const pageTemplate = handlebars.compile(await readSafeFile(pagePath));
-  const layoutTemplate = handlebars.compile(await readSafeFile(layoutPath));
-  const body = pageTemplate(viewConfig);
-
-  return layoutTemplate({
-    lang: 'da',
-    headScripts: [],
-    stylesheets: [],
-    bodyScripts: [],
-    ...viewConfig,
-    body
-  });
-}
-
-async function serveView(viewConfig, res) {
-  try {
-    const html = await renderView(viewConfig);
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache'
-    });
-    res.end(html);
-  } catch (err) {
-    sendJson(res, 500, {
-      error: 'View render failed',
-      message: err.message
-    });
+    try {
+      const stat = await fsp.stat(candidatePath);
+      if (stat.isFile()) {
+        return candidatePath;
+      }
+    } catch (_) {
+      continue;
+    }
   }
+
+  return null;
 }
 
 async function serveStatic(reqUrl, res) {
-  let pathname = decodeURIComponent(reqUrl.pathname);
-  if (pathname === '/') {
-    pathname = '/' + DEFAULT_PAGE;
-  }
+  const pathname = decodeURIComponent(reqUrl.pathname);
+  const filePath = await resolveStaticFile(pathname);
 
-  if (VIEW_ROUTES.has(pathname)) {
-    await serveView(VIEW_ROUTES.get(pathname), res);
-    return;
-  }
-
-  const filePath = path.join(ROOT, pathname);
-  if (!isSafePath(filePath)) {
-    sendJson(res, 403, { error: 'Forbidden path' });
+  if (!filePath) {
+    sendJson(res, 404, { error: 'Not found' });
     return;
   }
 
   try {
-    const stat = await fsp.stat(filePath);
-    if (stat.isDirectory()) {
-      sendJson(res, 404, { error: 'Directory listing not allowed' });
-      return;
-    }
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME[ext] || 'application/octet-stream';
     res.writeHead(200, {
@@ -284,7 +216,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const base = `http://${HOST}:${PORT}`;
   console.log('DBf analyzer server started');
-  console.log('Open:', `${base}/${DEFAULT_PAGE}`);
-  console.log('Histogram:', `${base}/dbf_handicap_histogram.html`);
-  console.log('Dashboard:', `${base}/dbf_dashboard.html`);
+  console.log('Open:', `${base}${DEFAULT_ROUTE}`);
+  console.log('Handicap comparison:', `${base}/tools/handicap-comparison/`);
+  console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
 });

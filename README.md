@@ -3,32 +3,40 @@ Various analyzers for bridge ranking in the Danish Bridge Federation
 
 ## Structure
 - `views/layouts/base.hbs`: Shared HTML document shell used by all rendered pages
-- `views/pages/dashboard.hbs`: Dashboard view body
-- `views/pages/handicap.hbs`: Player handicap comparison view body
-- `views/pages/handicap_histogram.hbs`: Handicap distribution view body
+- `views/pages/dashboard.html`: Dashboard view body
+- `views/pages/handicap.html`: Player handicap comparison view body
+- `views/pages/handicap_histogram.html`: Handicap distribution view body
 - `views/partials/analyzer_header.hbs`: Shared Handlebars header partial for analyzer pages
 - `views/partials/footer.hbs`: Shared Handlebars footer partial
+- `.eleventy.js`: Eleventy build configuration and passthrough asset setup
 - `css/analyzer-theme.css`: Shared UI theme used by both analyzers
 - `css/dbf_handicap.css`: Page-specific styles for comparison analyzer
 - `css/dbf_handicap_histogram.css`: Page-specific styles for histogram analyzer
 - `js/dbf_handicap.js`: Script for comparison analyzer
 - `js/dbf_handicap_histogram.js`: Script for histogram analyzer
 
-The `.html` routes are rendered server-side from `views/pages/*.hbs` through a shared Handlebars layout, so the public URLs stay the same while the HTML shell is centralized.
+Eleventy now builds the page layer from `views/pages/*.html` through the shared Handlebars layout, while `server.js` stays focused on the DBf relay endpoints and serving the generated `_site/` output.
 
 ## Run locally
-This project uses a small Node server that serves the pages and relays DBf requests through local API routes to avoid browser CORS issues.
+This project uses Eleventy to build the pages and a small Node server to serve the generated site plus relay DBf requests through local API routes to avoid browser CORS issues.
 
 1. Install dependencies:
 	- `npm install`
-2. Start the handicap analyzer page:
+2. Start the dashboard and Eleventy watcher:
 	- `npm run dev`
-3. Start the histogram page:
+3. Start directly on the handicap tool route:
+	- `npm run dev:handicap`
+4. Start directly on the distribution tool route:
 	- `npm run dev:histogram`
-4. Start the combined dashboard:
-	- `npm run dev:dashboard`
+5. Create a production build:
+	- `npm run build`
 
 By default, `npm run dev` starts on port 4173.
+
+## Routes
+- `/`: Dashboard / landing page
+- `/tools/handicap-comparison/`: Player handicap comparison analyzer
+- `/tools/handicap-distribution/`: Handicap distribution analyzer
 
 ## Local relay API
 - `GET /api/hacalle` -> fetches `https://medlemmer.bridge.dk/HACAlle.php`
@@ -47,5 +55,6 @@ This is the easiest way to host this project publicly while keeping the relay AP
 
 Notes:
 - `render.yaml` sets `HOST=0.0.0.0` so the service is reachable on Render.
+- `render.yaml` runs `npm run build` before starting the relay/static server.
 - Render injects `PORT` automatically, and `server.js` already uses it.
-- Default landing page is `dbf_dashboard.html` (set via `OPEN_PAGE`).
+- The homepage is `/`, backed by the Eleventy-generated dashboard page.

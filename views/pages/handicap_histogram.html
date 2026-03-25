@@ -1,3 +1,20 @@
+---
+layout: base.hbs
+title: DBf Handicap Fordeling
+ogTitle: DBf Handicap Fordeling
+description: Handicap-fordelingsanalyse for DBf klubber. Visualiser og analyser handicap-fordeling blandt danske bridgespillere.
+appleTitle: Handicap Fordeling
+headScripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js
+stylesheets:
+  - /css/analyzer-theme.css
+  - /css/dbf_handicap_histogram.css
+bodyScripts:
+  - /js/utils.js
+  - /js/dbf_handicap_histogram.js
+  - /js/theme.js
+permalink: /tools/handicap-distribution/index.html
+---
 <main class="page">
 <header>
   {{> analyzer_header headerRowClass="header-title-row" title="DBf Handicap Fordeling" subtitle="Danmarks Bridgeforbund" subtitleId="headerDesc"}}
