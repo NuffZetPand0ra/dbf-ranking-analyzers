@@ -22,10 +22,27 @@ let selectedClubs = [];
 let numBins = 62;
 let percentageMode = false;
 let showCdf = false;
+let showTrendline = false;
 let chart = null;
 let chartResizeObserver = null;
 let isRestoringState = false;
 let pendingUrlState = null;
+
+function buildTrendlineData(values) {
+  const radius = values.length > 40 ? 3 : 2;
+  return values.map((_, idx) => {
+    let total = 0;
+    let weightTotal = 0;
+    for (let offset = -radius; offset <= radius; offset++) {
+      const sample = values[idx + offset];
+      if (sample === undefined) continue;
+      const weight = radius + 1 - Math.abs(offset);
+      total += sample * weight;
+      weightTotal += weight;
+    }
+    return weightTotal ? total / weightTotal : values[idx];
+  });
+}
 
 const searchEl = document.getElementById('clubSearch');
 const dropEl = document.getElementById('clubDropdown');
@@ -103,6 +120,7 @@ function buildStateParams() {
   if (numBins !== 62) params.set('bins', String(numBins));
   if (percentageMode) params.set('pct', '1');
   if (showCdf) params.set('cdf', '1');
+  if (showTrendline) params.set('trend', '1');
   selectedClubs.forEach(club => params.append('club', club));
   return params;
 }
@@ -198,6 +216,7 @@ function restoreStateFromUrl() {
     bins: params.get('bins'),
     pct: params.get('pct') === '1',
     cdf: params.get('cdf') === '1',
+    trend: params.get('trend') === '1',
     clubs: params.getAll('club')
   };
 }
@@ -208,6 +227,7 @@ function applyPendingUrlStateToInputs() {
   const binValue = document.getElementById('binValue');
   const pctBox = document.getElementById('percentMode');
   const cdfBox = document.getElementById('cdfMode');
+  const trendBox = document.getElementById('trendMode');
   const hcMin = document.getElementById('hcMin');
   const hcMax = document.getElementById('hcMax');
 
@@ -223,6 +243,8 @@ function applyPendingUrlStateToInputs() {
   pctBox.checked = percentageMode;
   showCdf = pendingUrlState.cdf;
   if (cdfBox) cdfBox.checked = showCdf;
+  showTrendline = pendingUrlState.trend;
+  if (trendBox) trendBox.checked = showTrendline;
 
   if (pendingUrlState.min !== null) hcMin.value = pendingUrlState.min;
   if (pendingUrlState.max !== null) hcMax.value = pendingUrlState.max;
@@ -396,6 +418,28 @@ function renderChart(vals) {
     };
   });
 
+  if (showTrendline) {
+    datasets.forEach(ds => {
+      const total = ds.data.reduce((sum, count) => sum + count, 0);
+      const baseData = percentageMode && total > 0 ? ds.data.map(count => (count / total) * 100) : ds.data;
+      chartDatasets.push({
+        type: 'line',
+        label: 'Trend' + (datasets.length > 1 ? ' ' + ds.label : ''),
+        data: buildTrendlineData(baseData),
+        yAxisID: 'y',
+        borderColor: CLUB_COLORS[ds.color].replace('0.72', '1'),
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderDash: [6, 6],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        tension: 0.35,
+        fill: false,
+        spanGaps: true
+      });
+    });
+  }
+
   if (showCdf) {
     datasets.forEach(ds => {
       const total = ds.data.reduce((sum, v) => sum + v, 0);
@@ -434,7 +478,7 @@ function renderChart(vals) {
       animation: { duration: 250 },
       plugins: {
         legend: {
-          display: selectedClubs.length > 1 || showCdf,
+          display: selectedClubs.length > 1 || showCdf || showTrendline,
           position: 'top',
           labels: {
             color: '#63584d',
@@ -451,10 +495,15 @@ function renderChart(vals) {
               return 'HC ' + lo.toFixed(1).replace('.', ',') + '–' + (lo + w).toFixed(1).replace('.', ',');
             },
             label: (item) => {
-              if (percentageMode) {
-                return ' ' + item.raw.toFixed(1).replace('.', ',') + '%';
+              const datasetLabel = item.dataset.label ? item.dataset.label + ': ' : '';
+              if (item.dataset.yAxisID === 'y2') {
+                return datasetLabel + item.raw.toFixed(1).replace('.', ',') + '%';
               }
-              return ' ' + item.raw + ' spillere';
+              if (percentageMode) {
+                return datasetLabel + item.raw.toFixed(1).replace('.', ',') + '%';
+              }
+              const value = Number.isInteger(item.raw) ? String(item.raw) : item.raw.toFixed(1).replace('.', ',');
+              return datasetLabel + value + ' spillere';
             }
           },
           backgroundColor: 'rgba(255,255,255,.97)',
@@ -619,8 +668,10 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedClubs.length = 0;
     percentageMode = false;
     showCdf = false;
+    showTrendline = false;
     document.getElementById('percentMode').checked = false;
     document.getElementById('cdfMode').checked = false;
+    document.getElementById('trendMode').checked = false;
     document.getElementById('headerDesc').innerHTML = 'Danmarks Bridgeforbund';
     document.getElementById('dataAge').textContent = '';
     document.getElementById('dataAge').className = 'data-age';
@@ -686,6 +737,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('cdfMode').addEventListener('change', function() {
     showCdf = this.checked;
+    refresh();
+  });
+
+  document.getElementById('trendMode').addEventListener('change', function() {
+    showTrendline = this.checked;
     refresh();
   });
 
