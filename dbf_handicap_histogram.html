@@ -30,9 +30,7 @@
   <h1>DBf Handicap Fordeling</h1>
   <p id="headerDesc">Danmarks Bridgeforbund</p>
   <div class="update-row">
-    <label id="fileInputLabel" for="fileInput" title="Upload HACAlle.php">📂 Indlæs ny datafil</label>
     <button class="help-btn" id="fetchRemoteBtn" type="button" title="Hent HACAlle.php direkte fra DBf">🌐 Hent fra DBf</button>
-    <input type="file" id="fileInput" accept=".html,.htm,.php" style="display:none">
     <button class="help-btn" id="shareLinkBtn" type="button" title="Kopiér link med nuværende filtre">🔗 Del link</button>
     <button class="help-btn" id="exportChartBtn" type="button" title="Download diagram som PNG">💾 Gem diagram</button>
     <button class="help-btn" id="helpBtn" type="button">? Hjælp</button>
@@ -46,15 +44,7 @@
   <div id="noDataBox">
     <button id="closeOverlay" type="button" title="Luk">✕</button>
     <h2>Sådan henter du data</h2>
-    <p>Hent den seneste handicapliste manuelt fra DBf og upload den her:</p>
-    <ol>
-      <li>Åbn <a class="url" href="https://medlemmer.bridge.dk/HACAlle.php" target="_blank">https://medlemmer.bridge.dk/HACAlle.php</a> i din browser</li>
-      <li>Gem siden med <code>Ctrl+S</code> (Windows/Linux) eller <code>⌘+S</code> (Mac)</li>
-      <li>Gem som <strong>Webpage, HTML only</strong> (ikke "complete")</li>
-      <li>Upload den gemte fil herunder</li>
-    </ol>
-    <p>Filen gemmes i browseren og genbruges automatisk næste gang — du behøver kun at opdatere den, når dataene er forældede.</p>
-    <label id="uploadBtnBig" for="fileInput">📂 Vælg fil og indlæs</label>
+    <p>Klik på knappen "🌐 Hent fra DBf" ovenfor for at hente den nyeste handicapliste automatisk.</p>
   </div>
 </div>
 

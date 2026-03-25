@@ -27,8 +27,6 @@ const legendEl = document.getElementById('legend');
 const statsRowEl = document.getElementById('stats-row');
 const myChartEl = document.getElementById('myChart');
 const pillRowEl = document.getElementById('pill-row');
-const fileInputEl = document.getElementById('file-input');
-const addBtnEl = document.getElementById('add-btn');
 const datePresetSelect = document.getElementById('date-preset');
 const shareLinkBtn = document.getElementById('share-link-btn');
 const exportChartBtn = document.getElementById('export-chart-btn');
@@ -190,31 +188,6 @@ function updatePointStyles() {
   chart.update();
 }
 
-addBtnEl.addEventListener('click', () => fileInputEl.click());
-
-fileInputEl.addEventListener('change', function(e) {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-  let loaded = 0;
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const parsed = parseHtml(ev.target.result, file.name);
-      if (parsed.entries.length > 0) {
-        const idx = players.findIndex(p => p.name === parsed.name);
-        if (idx >= 0) players.splice(idx, 1, parsed); else players.push(parsed);
-      }
-      if (++loaded === files.length) {
-        updateDateRange();
-        rebuildPills();
-        render();
-      }
-    };
-    reader.readAsText(file, 'windows-1252');
-  });
-  this.value = '';
-});
-
 function parseHtml(html, filename) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   let name = filename.replace(/\.html?$/i, '');
@@ -342,6 +315,15 @@ function togglePlayerVisibility(i) {
   render();
 }
 
+function deleteAllPlayers() {
+  players.length = 0;
+  hiddenPlayers.clear();
+  dbfNumberInput.value = '';
+  setFetchPlayerStatus('', '');
+  rebuildPills();
+  render();
+}
+
 function rebuildPills() {
   pillRowEl.innerHTML = '';
   players.forEach((p, i) => {
@@ -380,11 +362,14 @@ function rebuildPills() {
     pill.addEventListener('click', () => togglePlayerVisibility(i));
     pillRowEl.appendChild(pill);
   });
-  const ab = document.createElement('span');
-  ab.className = 'add-btn';
-  ab.textContent = '+ Tilføj spiller';
-  ab.addEventListener('click', () => fileInputEl.click());
-  pillRowEl.appendChild(ab);
+  
+  if (players.length > 0) {
+    const deleteBtn = document.createElement('span');
+    deleteBtn.className = 'add-btn';
+    deleteBtn.textContent = 'Slet alle spillere';
+    deleteBtn.addEventListener('click', deleteAllPlayers);
+    pillRowEl.appendChild(deleteBtn);
+  }
 }
 
 function render() {

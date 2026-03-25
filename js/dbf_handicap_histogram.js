@@ -32,7 +32,6 @@ const pillArea = document.getElementById('pillArea');
 const noDataOverlay = document.getElementById('noDataOverlay');
 const helpBtn = document.getElementById('helpBtn');
 const closeOverlayBtn = document.getElementById('closeOverlay');
-const uploadBtnBig = document.getElementById('uploadBtnBig');
 const fetchRemoteBtn = document.getElementById('fetchRemoteBtn');
 const shareLinkBtn = document.getElementById('shareLinkBtn');
 const exportChartBtn = document.getElementById('exportChartBtn');
@@ -277,27 +276,6 @@ function applyNewData(clubData, timestamp) {
   searchEl.value = '';
   applyPendingUrlStateToData();
   refresh();
-}
-
-function handleFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const parsed = parseHACHtml(e.target.result);
-      const nPlayers = Object.values(parsed).flat().length;
-      if (nPlayers < 100) throw new Error('Kun ' + nPlayers + ' spillere fundet — forkert fil?');
-      const ts = Date.now();
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-        localStorage.setItem(CACHE_TS, String(ts));
-      } catch (_) {}
-      applyNewData(parsed, ts);
-    } catch (err) {
-      alert('Kunne ikke indlæse fil: ' + err.message);
-    }
-  };
-  reader.readAsText(file, 'utf-8');
 }
 
 function stats(vals) {
@@ -582,12 +560,6 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreStateFromUrl();
   applyPendingUrlStateToInputs();
 
-  const fi = document.getElementById('fileInput');
-  fi.addEventListener('change', () => {
-    handleFile(fi.files[0]);
-    fi.value = '';
-  });
-
   document.getElementById('clearBtn').addEventListener('click', () => {
     if (!confirm('Ryd cachet data? Du skal uploade en ny fil for at se histogrammet igen.')) return;
     try {
@@ -627,10 +599,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   closeOverlayBtn.addEventListener('click', () => {
-    noDataOverlay.style.display = 'none';
-  });
-
-  uploadBtnBig.addEventListener('click', () => {
     noDataOverlay.style.display = 'none';
   });
 
@@ -696,6 +664,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('dataAge').textContent += ' — overvej at opdatere';
         document.getElementById('dataAge').className = 'data-age stale';
       }
+    } else {
+      // No cached data; fetch automatically instead of showing overlay
+      fetchAndApplyRemoteData();
     }
   } catch (_) {}
 });
