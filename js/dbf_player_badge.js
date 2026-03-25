@@ -445,23 +445,23 @@ function render() {
 
   const predEntries = generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths);
 
-  // ── Build chart labels (all actual + pred) ───────────────────────────────
-  const actualLabels = filteredEntries.map(e => fmtDate(e.date));
-  const predLabels   = predEntries.map(e => fmtDate(e.date));
-  const allLabels    = [...actualLabels, ...predLabels];
+  // ── Build chart labels — unified sorted timeline ──────────────────────────
+  // Prediction always starts at anchorDate; include it as the first pred point
+  // so the dashed line begins exactly there, even when anchorDate is mid-range.
+  const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
 
-  const actualDataFull = [
-    ...filteredEntries.map(e => e.hc),
-    ...Array(predLabels.length).fill(null)
-  ];
+  // Merge actual + prediction timestamps into one sorted unique set
+  const actualTimes = filteredEntries.map(e => e.date.getTime());
+  const predTimes   = predWithAnchor.map(e => e.date.getTime());
+  const allTimes    = [...new Set([...actualTimes, ...predTimes])].sort((a, b) => a - b);
 
-  // Prediction dataset: null-pad actual range, overlap last actual point for visual join
-  const overlapHc = hasData ? filteredEntries[filteredEntries.length - 1].hc : anchorHc;
-  const predDataFull = [
-    ...Array(Math.max(0, actualLabels.length - 1)).fill(null),
-    overlapHc,
-    ...predEntries.map(e => e.hc)
-  ];
+  const allLabels = allTimes.map(t => fmtDate(new Date(t)));
+
+  const actualMap = new Map(filteredEntries.map(e => [e.date.getTime(), e.hc]));
+  const predMap   = new Map(predWithAnchor.map(e => [e.date.getTime(), e.hc]));
+
+  const actualDataFull = allTimes.map(t => actualMap.has(t) ? actualMap.get(t) : null);
+  const predDataFull   = allTimes.map(t => predMap.has(t)   ? predMap.get(t)   : null);
 
   const actualDataset = {
     label: 'Faktisk HC',
