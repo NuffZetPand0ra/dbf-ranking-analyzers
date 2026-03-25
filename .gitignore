@@ -1,3 +1,11 @@
 node_modules/
 _site/
 sample_html/
+
+# Ignore all dotfiles/dotfolders by default
+.*
+
+# Unignore tracked dotfiles
+!.gitignore
+!.eleventy.js
+!.well-known/
