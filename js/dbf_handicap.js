@@ -290,7 +290,9 @@ function bucketKey(date, gran) {
 function bucketLabel(key, gran) {
   if (gran === 'all') {
     const d = new Date(key);
-    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${d.getFullYear()}`;
   }
   if (gran === 'week') return key.replace('-W', '\u00a0uge ');
   if (gran === 'month') {

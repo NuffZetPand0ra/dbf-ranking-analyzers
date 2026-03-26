@@ -439,7 +439,10 @@ function notifyEmbedHeight() {
 
 // ── Date formatting ───────────────────────────────────────────────────────────
 function fmtDate(d) {
-  return d.toLocaleDateString('da-DK', { day: '2-digit', month: 'short', year: '2-digit' });
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function toIso(d) {
