@@ -138,6 +138,12 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+.tag-blue {
+  background: rgba(55, 138, 221, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(55, 138, 221, 0.3);
+}
+
 .tool-name {
   font-size: 1.28rem;
   font-weight: 800;

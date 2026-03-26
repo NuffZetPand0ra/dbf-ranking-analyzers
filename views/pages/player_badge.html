@@ -1,0 +1,119 @@
+---
+layout: base.hbs
+title: DBf Spillerbadge
+ogTitle: DBf Spillerbadge
+description: Generér et delbart spillerbadge med HC-historik, fremtidsprognose, stabilitetscore og national/klub-percentil.
+appleTitle: Spillerbadge
+headScripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
+stylesheets:
+  - /css/analyzer-theme.css
+  - /css/dbf_player_badge.css
+bodyScripts:
+  - /js/utils.js
+  - /js/dbf_player_badge.js
+  - /js/theme.js
+permalink: /tools/player-badge/index.html
+---
+<main class="page">
+<header>
+  {{> analyzer_header headerRowClass="page-header" title="DBf Spillerbadge" titleClass="page-title" subtitle="Visualiser og forudsig HC-udvikling for én spiller." subtitleClass="page-subtitle"}}
+</header>
+
+<!-- ── Controls (outside badge, not exported) ─────────────── -->
+<div class="badge-controls">
+
+  <!-- Row 1: Player search -->
+  <div class="badge-control-row">
+    <div>
+      <span class="lbl">Spiller</span>
+      <div class="autocomplete-wrapper">
+        <input type="text" id="badge-search" placeholder="Søg efter spiller..." autocomplete="off" aria-label="Søg spiller">
+        <div class="autocomplete-dropdown" id="badge-dropdown" style="display:none"></div>
+      </div>
+    </div>
+    <span class="fetch-status" id="badge-status"></span>
+  </div>
+
+  <!-- Row 2: Date range + prediction length + regression window -->
+  <div class="badge-control-row">
+    <div><span class="lbl">Fra dato</span><input type="date" id="badge-from"></div>
+    <div><span class="lbl">Prognose fra</span><input type="date" id="badge-to"></div>
+    <div>
+      <span class="lbl">Prognose (mdr.)</span>
+      <input type="number" id="badge-pred-months" value="12" min="1" max="120" step="1" style="width:72px">
+    </div>
+    <div>
+      <span class="lbl">Regressionsvindue (mdr.)</span>
+      <input type="number" id="badge-reg-months" value="12" min="1" max="120" step="1" style="width:72px">
+    </div>
+  </div>
+
+  <!-- Row 3: Optimism + actions -->
+  <div class="badge-control-row">
+    <span class="lbl-inline">Pessimistisk</span>
+    <input type="range" id="badge-optimism" min="-2" max="2" step="0.1" value="0" style="width:140px;accent-color:var(--accent)">
+    <span class="lbl-inline">Optimistisk</span>
+    <span class="badge-opt-val" id="badge-opt-val">0.0</span>
+    <span class="add-btn" id="badge-share-btn">Del link</span>
+    <span class="add-btn" id="badge-export-btn">💾 Gem badge</span>
+  </div>
+</div>
+
+<!-- ── Empty state ─────────────────────────────────────────── -->
+<div class="badge-empty" id="badge-empty">Søg efter en spiller ovenfor for at generere et badge.</div>
+
+<!-- ── Badge card ──────────────────────────────────────────── -->
+<div id="badge-wrap" style="display:none">
+  <div class="badge-card" id="badge-card">
+
+    <!-- Header: player info left, current HC right -->
+    <div class="badge-header">
+      <div class="badge-player-info">
+        <div class="badge-name" id="badge-name"></div>
+        <div class="badge-meta" id="badge-meta"></div>
+      </div>
+      <div class="badge-current-hc">
+        <span class="badge-hc-val" id="badge-hc-val"></span>
+        <span class="badge-hc-lbl">Nuv. HC</span>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="badge-chart-wrap">
+      <canvas id="badge-chart"></canvas>
+    </div>
+
+    <!-- Prediction legend -->
+    <div class="badge-pred-legend" id="badge-pred-legend">
+      <span class="badge-legend-line">
+        <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#378ADD" stroke-width="2.5"/></svg>
+        Faktisk HC
+      </span>
+      <span class="badge-legend-line">
+        <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#f59e0b" stroke-width="2"/></svg>
+        Prognose
+      </span>
+    </div>
+
+    <!-- Stats row: Min / Max / Stability / Change -->
+    <div class="badge-stats" id="badge-stats"></div>
+
+    <!-- Percentile strip: National / Club -->
+    <div class="badge-percentile" id="badge-percentile"></div>
+
+    <!-- Footer: datestamp + QR -->
+    <div class="badge-footer">
+      <div class="badge-datestamp">
+        <span class="badge-datestamp-label">Genereret</span>
+        <span class="badge-datestamp-val" id="badge-datestamp"></span>
+      </div>
+      <div class="badge-qr" id="badge-qr"></div>
+    </div>
+
+  </div>
+</div>
+
+{{> footer wrapperClass="page-footer"}}
+</main>

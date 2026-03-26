@@ -157,6 +157,62 @@ permalink: /index.html
       </div>
     </article>
 
+    <article class="tool-card">
+      <div class="tool-screen" aria-hidden="true">
+        <svg class="preview-svg" viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spillerbadge med HC-historik og prognose">
+          <!-- Badge card outline -->
+          <rect x="18" y="10" width="244" height="112" rx="8" fill="rgba(55,138,221,0.07)" stroke="rgba(55,138,221,0.25)" stroke-width="1.2"/>
+          <!-- Header band -->
+          <rect x="18" y="10" width="244" height="28" rx="8" fill="rgba(55,138,221,0.13)"/>
+          <rect x="18" y="28" width="244" height="10" fill="rgba(55,138,221,0.13)"/>
+          <!-- Player name stub -->
+          <rect x="28" y="18" width="72" height="6" rx="2" fill="rgba(255,255,255,0.35)"/>
+          <rect x="28" y="27" width="44" height="4" rx="2" fill="rgba(255,255,255,0.18)"/>
+          <!-- HC number top-right -->
+          <text x="220" y="29" font-family="IBM Plex Mono,monospace" font-size="13" font-weight="700" fill="#60a5fa">22.2</text>
+          <!-- Chart area: actual line (solid) -->
+          <path d="M 28,90 C 48,88 68,82 90,76 C 112,70 132,65 154,58 C 170,52 186,50 200,48"
+                fill="none" stroke="#378ADD" stroke-width="2" stroke-linecap="round"/>
+          <!-- Chart area: prediction (dashed) -->
+          <path d="M 200,48 C 214,45 228,42 252,39"
+                fill="none" stroke="#378ADD88" stroke-width="1.8" stroke-dasharray="4,3" stroke-linecap="round"/>
+          <!-- Stat blocks at bottom -->
+          <rect x="18" y="100" width="244" height="22" rx="0" fill="rgba(0,0,0,0.15)"/>
+          <rect x="18" y="99" width="244" height="1" fill="rgba(55,138,221,0.2)"/>
+          <text x="32"  y="114" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.4)">Min</text>
+          <text x="32"  y="109" font-family="IBM Plex Mono,monospace" font-size="6" fill="rgba(255,255,255,0.22)">18.76</text>
+          <text x="88"  y="114" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.4)">Max</text>
+          <text x="88"  y="109" font-family="IBM Plex Mono,monospace" font-size="6" fill="rgba(255,255,255,0.22)">51.4</text>
+          <text x="144" y="114" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.4)">Stab.</text>
+          <text x="144" y="109" font-family="IBM Plex Mono,monospace" font-size="6" fill="rgba(255,255,255,0.22)">82/100</text>
+          <text x="200" y="114" font-family="IBM Plex Mono,monospace" font-size="7" fill="rgba(255,255,255,0.4)">Top 73%</text>
+        </svg>
+      </div>
+      <div class="tool-body">
+        <div class="tool-meta">
+          <span class="tool-tag tag-blue">Spillerbadge</span>
+        </div>
+        <h2 class="tool-name">Spiller&shy;badge</h2>
+        <p class="tool-desc">Generér et delbart badge for én spiller med HC-historik, fremtidsprognose og nøglestatistik. Se om din faktiske udvikling følger prognosen over tid.</p>
+        <ul class="feature-list">
+          <li>HC-historik med justerbar datoperiode</li>
+          <li>Fremtidsprognose via lineær regression med optimisme-slider</li>
+          <li>Stabilitetscore og national/klub-percentil</li>
+          <li>Delebart via link — prognosen er fast-forankret i tid</li>
+        </ul>
+        <div class="tool-footer">
+          <div class="datasource">
+            <span class="ds-label">Datakilde</span>
+            <code>LookUpHAC.php?DBFNr=XXXXX</code>
+          </div>
+          <a class="cta-btn" href="/tools/player-badge/">
+            Åbn værktøj
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7h9m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+      </div>
+    </article>
+
   </section>
 
   {{> footer wrapperClass="portal-footer"}}

@@ -1,0 +1,270 @@
+/* ── Theme variables (avoid color-mix() — html2canvas can't parse it) ──── */
+:root {
+  /* color-mix(in srgb, #14b8a6 16%, #201c18) */
+  --badge-header-tint: rgb(30, 53, 47);
+}
+[data-theme="light"] {
+  /* color-mix(in srgb, #0f766e 16%, #ffffff) */
+  --badge-header-tint: rgb(217, 233, 232);
+}
+
+/* ── Controls panel ──────────────────────────────────────── */
+.badge-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.badge-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+
+.badge-control-row .lbl {
+  display: block;
+  margin-bottom: 4px;
+}
+
+#badge-search { width: 100%; font-family: 'IBM Plex Mono', monospace; }
+
+.lbl-inline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.67rem;
+  color: var(--muted);
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.badge-opt-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+  min-width: 3ch;
+  padding-bottom: 2px;
+}
+
+.fetch-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  padding-bottom: 2px;
+  transition: color 0.2s;
+}
+.fetch-status.ok  { color: var(--fresh); }
+.fetch-status.err { color: var(--danger); }
+
+/* ── Empty state ─────────────────────────────────────────── */
+.badge-empty {
+  text-align: center;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  padding: 3rem 1rem;
+}
+
+/* ── Badge card ──────────────────────────────────────────── */
+.badge-card {
+  background: var(--surface-solid);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  max-width: 740px;
+  margin: 0 auto;
+  box-shadow: var(--shadow);
+}
+
+/* ── Badge header ────────────────────────────────────────── */
+.badge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem 1rem;
+  background: linear-gradient(
+    135deg,
+    var(--badge-header-tint),
+    var(--surface-solid) 65%
+  );
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.badge-player-info { flex: 1; min-width: 0; }
+
+.badge-name {
+  font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.3rem;
+}
+
+.badge-current-hc {
+  text-align: right;
+  flex-shrink: 0;
+}
+.badge-hc-val {
+  display: block;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 800;
+  color: var(--accent-strong);
+  font-family: 'IBM Plex Mono', monospace;
+  line-height: 1;
+}
+.badge-hc-lbl {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 3px;
+  text-align: right;
+}
+
+/* ── Chart area ──────────────────────────────────────────── */
+.badge-chart-wrap {
+  padding: 0.75rem 1rem 0.5rem;
+  height: 280px;
+  position: relative;
+}
+
+/* ── Prediction legend ───────────────────────────────────── */
+.badge-pred-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0.35rem 1rem 0.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.badge-legend-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge-legend-line svg { flex-shrink: 0; }
+
+/* ── Stats grid ──────────────────────────────────────────── */
+.badge-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--border);
+}
+
+.badge-stats .stat-card {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  background: transparent;
+}
+.badge-stats .stat-card:last-child { border-right: none; }
+
+/* ── Percentile strip ────────────────────────────────────── */
+.badge-percentile {
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.badge-pct-item {
+  flex: 1;
+  padding: 0.65rem 1rem;
+}
+.badge-pct-item:first-child { border-right: 1px solid var(--border); }
+
+.badge-pct-label {
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 3px;
+}
+.badge-pct-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.badge-pct-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ── Badge footer (datestamp + QR) ──────────────────────── */
+.badge-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem 0.7rem;
+  border-top: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.badge-datestamp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-datestamp-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.badge-datestamp-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+/* QR code: white bg + blue ink; always scannnable regardless of theme */
+.badge-qr svg,
+.badge-qr canvas,
+.badge-qr img {
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 6px rgba(55,138,221,0.25);
+  flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .badge-chart-wrap { height: 220px; }
+  /* 5 cards → 3 + 2 rows */
+  .badge-stats { grid-template-columns: repeat(3, 1fr); }
+  /* 3rd card in row 1 has no right border; 5th card (last) already handled */
+  .badge-stats .stat-card:nth-child(3) { border-right: none; }
+  /* Bottom border on the whole first row */
+  .badge-stats .stat-card:nth-child(1),
+  .badge-stats .stat-card:nth-child(2),
+  .badge-stats .stat-card:nth-child(3) { border-bottom: 1px solid var(--border); }
+  /* 5th card: no right border and no extra border */
+  .badge-stats .stat-card:nth-child(5) { border-right: none; }
+  .badge-header { padding: 1rem; }
+  .badge-hc-val { font-size: 1.8rem; }
+}

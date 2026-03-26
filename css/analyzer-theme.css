@@ -121,12 +121,16 @@ select {
 .help-btn,
 .clear-btn,
 #uploadBtnBig {
+  display: inline-block;
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
   letter-spacing: 0.02em;
+  padding: 5px 12px;
+  user-select: none;
+  white-space: nowrap;
   transition: background 0.16s, border-color 0.16s, color 0.16s;
 }
 
@@ -322,6 +326,47 @@ select {
   display: flex;
   justify-content: flex-end;
   padding: 1rem 0.5rem 0;
+}
+
+/* ── Autocomplete (shared across all tools) ─────────────────────────────── */
+.autocomplete-wrapper {
+  position: relative;
+  display: inline-block;
+  width: min(360px, 100%);
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.autocomplete-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover,
+.autocomplete-item-active { background: var(--surface-muted); }
+
+.autocomplete-item-name { font-weight: 600; color: var(--text); }
+.autocomplete-item-club {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
 }
 
 @media (max-width: 900px) {
