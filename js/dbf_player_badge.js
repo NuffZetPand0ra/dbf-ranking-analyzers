@@ -368,13 +368,15 @@ function render() {
     return;
   }
 
-  const from        = getFrom();
-  const to          = getTo();
-  const predMonths  = Math.max(0, parseInt(predMonthsEl.value, 10) || 12);
-  const opt         = parseFloat(optimismEl.value) || 0;
+  const from       = getFrom();
+  const predMonths = Math.max(0, parseInt(predMonthsEl.value, 10) || 12);
+  const opt        = parseFloat(optimismEl.value) || 0;
 
-  // Filter actual entries to date range
-  const filteredEntries = filterEntries(currentPlayer.entries, from, to);
+  // "to" is the anchor/prediction-start date. Show ALL actual entries from
+  // `from` onwards — no upper filter — so the chart always shows the most
+  // recent real data regardless of the anchor.
+  const anchorDate = getTo() || new Date();
+  const filteredEntries = filterEntries(currentPlayer.entries, from, null);
 
   // Fallback if nothing in range — show badge frame with "ingen data" note
   const hasData = filteredEntries.length > 0;
@@ -394,34 +396,12 @@ function render() {
   const natPct  = allPlayersData ? nationalPercentile(currentHc, allPlayersData) : null;
   const clubPct = allPlayersData ? clubPercentile(currentHc, currentPlayer.club, allPlayersData) : null;
 
-  // ── Prediction anchor ────────────────────────────────────────────────────
-  // Use URL-encoded anchor if present, else use last filtered entry date
-  const params = new URLSearchParams(window.location.search);
-  let anchorDateStr = params.get('ps');
-  let anchorDate, anchorHc;
-
-  if (anchorDateStr && hasData) {
-    anchorDate = new Date(anchorDateStr + 'T12:00:00');
-    // HC at anchor: find last entry up to that date
-    const beforeAnchor = currentPlayer.entries.filter(e => e.date <= anchorDate);
-    anchorHc = beforeAnchor.length
-      ? beforeAnchor[beforeAnchor.length - 1].hc
-      : currentPlayer.entries[0].hc;
-  } else if (hasData) {
-    const lastEntry = filteredEntries[filteredEntries.length - 1];
-    anchorDate    = lastEntry.date;
-    anchorHc      = lastEntry.hc;
-    anchorDateStr = toIso(anchorDate);
-    // Write anchor into URL state on first render
-    if (!isRestoringState) {
-      const p = new URLSearchParams(window.location.search);
-      p.set('ps', anchorDateStr);
-      window.history.replaceState({}, '', window.location.pathname + '?' + p.toString());
-    }
-  } else {
-    anchorDate = new Date();
-    anchorHc   = currentHc;
-  }
+  // HC at anchor: last entry on or before the anchor date
+  let anchorHc;
+  const beforeAnchor = currentPlayer.entries.filter(e => e.date <= anchorDate);
+  anchorHc = beforeAnchor.length
+    ? beforeAnchor[beforeAnchor.length - 1].hc
+    : (hasData ? filteredEntries[0].hc : currentHc);
 
   // Regression for prediction slope.
   // Use the explicit regression window (regMonths back from the anchor date),
@@ -598,11 +578,6 @@ function buildStateParams() {
   const opt = parseFloat(optimismEl.value);
   if (opt !== 0) p.set('opt', String(opt));
 
-  // Carry forward existing anchor date if present
-  const existing = new URLSearchParams(window.location.search);
-  const ps = existing.get('ps');
-  if (ps) p.set('ps', ps);
-
   return p;
 }
 
@@ -707,13 +682,7 @@ async function exportBadge() {
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
-fromEl.addEventListener('change', () => {
-  // Reset anchor when date range changes
-  const p = new URLSearchParams(window.location.search);
-  p.delete('ps');
-  window.history.replaceState({}, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
-  render();
-});
+fromEl.addEventListener('change', render);
 toEl.addEventListener('change', render);
 predMonthsEl.addEventListener('input', render);
 regMonthsEl.addEventListener('input', render);
