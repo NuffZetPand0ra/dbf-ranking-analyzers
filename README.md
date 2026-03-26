@@ -5,6 +5,10 @@ Small web tools for exploring handicap data from Danmarks Bridgeforbund.
 Live site:
 - `https://dbf-ranking-analyzers.onrender.com/`
 
+## License
+
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, modify, and share the code for any noncommercial purpose. Commercial use is not permitted.
+
 ## What It Does
 
 This project provides five browser-based analyzers:

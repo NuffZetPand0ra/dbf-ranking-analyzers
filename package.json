@@ -2,6 +2,7 @@
   "name": "dbf-ranking-analyzers",
   "version": "1.0.0",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "description": "Static analyzers for DBF handicap views",
   "scripts": {
     "build": "eleventy",
