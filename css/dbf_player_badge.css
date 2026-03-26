@@ -165,7 +165,7 @@
 /* ── Stats grid ──────────────────────────────────────────── */
 .badge-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border-top: 1px solid var(--border);
 }
 
@@ -215,10 +215,16 @@
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 600px) {
   .badge-chart-wrap { height: 220px; }
-  .badge-stats { grid-template-columns: repeat(2, 1fr); }
-  .badge-stats .stat-card:nth-child(2) { border-right: none; }
+  /* 5 cards → 3 + 2 rows */
+  .badge-stats { grid-template-columns: repeat(3, 1fr); }
+  /* 3rd card in row 1 has no right border; 5th card (last) already handled */
+  .badge-stats .stat-card:nth-child(3) { border-right: none; }
+  /* Bottom border on the whole first row */
   .badge-stats .stat-card:nth-child(1),
-  .badge-stats .stat-card:nth-child(2) { border-bottom: 1px solid var(--border); }
+  .badge-stats .stat-card:nth-child(2),
+  .badge-stats .stat-card:nth-child(3) { border-bottom: 1px solid var(--border); }
+  /* 5th card: no right border and no extra border */
+  .badge-stats .stat-card:nth-child(5) { border-right: none; }
   .badge-header { padding: 1rem; }
   .badge-hc-val { font-size: 1.8rem; }
 }

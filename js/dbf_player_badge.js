@@ -356,7 +356,15 @@ function stabilityScore(entries) {
     : score > 25            ? 'Moderat'
     :                         'Lav';
 
-  return { score, label };
+  return {
+    score, label,
+    scoreA: Math.round(scoreA),
+    scoreB: Math.round(scoreB),
+    avgEntryDelta,
+    avgMonthDelta: monthHcs.length >= 2
+      ? (monthHcs.reduce((s, v, i) => i === 0 ? 0 : s + Math.abs(v - monthHcs[i - 1]), 0) / (monthHcs.length - 1))
+      : 0,
+  };
 }
 
 // ── Percentile ────────────────────────────────────────────────────────────────
@@ -570,22 +578,19 @@ function render() {
   // ── Stats cards ──────────────────────────────────────────────────────────
   statsEl.innerHTML = '';
 
-  const stabColor = stability.score > 75 ? 'var(--fresh)'
-    : stability.score > 50 ? 'var(--accent)'
-    : stability.score > 25 ? 'var(--muted)'
+  const scoreColor = s => s > 75 ? 'var(--fresh)'
+    : s > 50 ? 'var(--accent)'
+    : s > 25 ? 'var(--muted)'
     : 'var(--danger)';
 
-  const changeSub = hcChange < 0
-    ? '▼ ' + Math.abs(hcChange).toFixed(2) + ' forbedring'
-    : hcChange > 0
-    ? '▲ ' + hcChange.toFixed(2) + ' forværring'
-    : 'Ingen ændring';
-
   statsEl.append(
-    makeStatCard('Min HC',    minHc.toFixed(2),     'i perioden'),
-    makeStatCard('Max HC',    maxHc.toFixed(2),     'i perioden'),
-    makeStatCard('Stabilitet', stability.score + '/100', stability.label, stabColor),
-    makeStatCard('HC-ændring', (hcChange >= 0 ? '+' : '') + hcChange.toFixed(2), changeSub)
+    makeStatCard('Min HC',  minHc.toFixed(2), 'i perioden'),
+    makeStatCard('Max HC',  maxHc.toFixed(2), 'i perioden'),
+    makeStatCard('Stabilitet',   stability.score + '/100', stability.label,  scoreColor(stability.score)),
+    makeStatCard('Pr. spil',     stability.scoreA + '/100',
+      'ø ' + stability.avgEntryDelta.toFixed(3) + ' Δhc pr. spil',          scoreColor(stability.scoreA)),
+    makeStatCard('Pr. måned',    stability.scoreB + '/100',
+      'ø ' + stability.avgMonthDelta.toFixed(2)  + ' Δhc pr. måned',        scoreColor(stability.scoreB))
   );
 
   // ── Percentile strip ─────────────────────────────────────────────────────
