@@ -1,0 +1,429 @@
+.wp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.2rem;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.wp-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+
+.wp-search-group {
+  flex: 1 1 280px;
+}
+
+.wp-search-group .lbl {
+  display: block;
+  margin-bottom: 4px;
+}
+
+#wp-search {
+  width: 100%;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.wp-load-status {
+  min-height: 1.2rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.wp-load-status.err { color: var(--danger); }
+.wp-load-status.ok { color: var(--fresh); }
+
+.wp-load-status-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wp-loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(20, 184, 166, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: wp-spin 0.6s linear infinite;
+}
+
+@keyframes wp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.wp-cancel-btn {
+  display: inline-block;
+  border: 1px solid rgba(224, 90, 58, 0.4);
+  border-radius: 6px;
+  background: rgba(224, 90, 58, 0.1);
+  color: var(--danger);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s, border-color 0.16s;
+  user-select: none;
+  margin-left: 4px;
+}
+
+.wp-cancel-btn:hover {
+  background: rgba(224, 90, 58, 0.18);
+}
+
+.wp-empty {
+  text-align: center;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  padding: 3rem 1rem;
+}
+
+.wp-wrap {
+  display: grid;
+  gap: 1rem;
+}
+
+.wp-overview {
+  background: var(--surface-solid);
+  padding: 1rem 1.2rem;
+}
+
+.wp-overview-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.wp-player {
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.wp-player-meta {
+  margin-top: 0.3rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.wp-overview-side {
+  min-width: 220px;
+  text-align: right;
+}
+
+.wp-overview-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.wp-overview-value {
+  margin-top: 0.2rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.wp-overview-sub {
+  margin-top: 0.25rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.wp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-solid);
+}
+
+.wp-stats .stat-card {
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.85rem 1rem;
+  background: transparent;
+}
+
+.wp-stats .stat-card:last-child {
+  border-right: none;
+}
+
+.wp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wp-tab {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 5px 12px;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
+  background: transparent;
+  color: var(--muted);
+}
+
+.wp-tab:hover {
+  background: rgba(13, 148, 136, 0.08);
+  color: var(--text);
+}
+
+.wp-tab-active {
+  background: rgba(13, 148, 136, 0.14);
+  color: var(--text);
+  border-color: rgba(13, 148, 136, 0.45);
+}
+
+.wp-panel {
+  background: var(--surface-solid);
+  padding: 1rem 1.2rem;
+}
+
+.wp-panel-head {
+  margin-bottom: 0.75rem;
+}
+
+.wp-panel-head h3 {
+  font-size: clamp(0.9rem, 1.5vw, 1.05rem);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wp-panel-sub {
+  margin-top: 0.2rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.wp-detail-select {
+  margin-top: 0.5rem;
+  min-width: 240px;
+}
+
+.wp-table-wrap {
+  overflow-x: auto;
+}
+
+.wp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+}
+
+.wp-table th {
+  text-align: left;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.wp-table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.wp-table tr:last-child td {
+  border-bottom: none;
+}
+
+.wp-table tbody tr:hover {
+  background: rgba(13, 148, 136, 0.06);
+}
+
+.wp-table td:last-child,
+.wp-table th:last-child {
+  text-align: right;
+}
+
+.wp-table-empty {
+  color: var(--muted);
+  font-style: italic;
+  text-align: center;
+}
+
+/* ── Expandable tree rows ── */
+
+.wp-tree-parent {
+  cursor: pointer;
+  user-select: none;
+}
+
+.wp-tree-parent:hover {
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.wp-tree-toggle {
+  display: inline-block;
+  width: 1.1em;
+  font-size: 0.62rem;
+  color: var(--muted);
+  transition: transform 0.15s;
+  text-align: center;
+  margin-right: 4px;
+}
+
+.wp-tree-open .wp-tree-toggle {
+  color: var(--accent);
+}
+
+.wp-tree-child {
+  background: var(--surface-muted);
+}
+
+.wp-tree-child:hover {
+  background: rgba(13, 148, 136, 0.04) !important;
+}
+
+.wp-tree-child-cell {
+  padding-left: 1.8rem !important;
+}
+
+.wp-tree-child-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wp-tree-date {
+  font-size: 0.72rem;
+  color: var(--text);
+  white-space: nowrap;
+  min-width: 6.5em;
+}
+
+.wp-tree-location {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wp-tree-link {
+  font-size: 0.62rem;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.wp-tree-link:hover {
+  background: rgba(13, 148, 136, 0.14);
+  color: var(--accent-strong);
+}
+
+.wp-tree-hc-cell {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--muted);
+  text-align: right;
+}
+
+.wp-hc-down {
+  color: var(--fresh);
+}
+
+.wp-hc-up {
+  color: var(--danger);
+}
+
+.wp-note {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.65;
+  color: var(--muted);
+  padding: 0 0.1rem;
+}
+
+@media (max-width: 860px) {
+  .wp-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .wp-stats .stat-card {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wp-stats .stat-card:nth-child(2n) {
+    border-right: none;
+  }
+
+  .wp-stats .stat-card:nth-last-child(-n + 2) {
+    border-bottom: none;
+  }
+
+  .wp-stats .stat-card:last-child {
+    border-right: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .wp-overview-side {
+    text-align: left;
+    min-width: 0;
+  }
+
+  .wp-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .wp-stats .stat-card {
+    border-right: none;
+  }
+
+  .wp-stats .stat-card:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wp-tabs {
+    gap: 4px;
+  }
+
+  .wp-tab {
+    font-size: 0.65rem;
+    padding: 4px 8px;
+  }
+}
