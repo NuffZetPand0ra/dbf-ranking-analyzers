@@ -445,22 +445,27 @@ function render() {
 
   const predEntries = generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths);
 
-  // ── Build chart labels — unified sorted timeline ──────────────────────────
-  // Prediction always starts at anchorDate; include it as the first pred point
-  // so the dashed line begins exactly there, even when anchorDate is mid-range.
+  // ── Build chart labels — unified sorted category timeline ─────────────────
+  // Category scale gives each data point equal visual width, which looks much
+  // better than a linear time scale when dense actual entries (weekly) sit
+  // alongside sparse prediction points (monthly).
+  //
+  // The prediction always starts at anchorDate. Include it as the first pred
+  // point so the dashed line begins exactly at ps, even when ps is mid-range.
   const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
 
   // Merge actual + prediction timestamps into one sorted unique set
   const actualTimes = filteredEntries.map(e => e.date.getTime());
   const predTimes   = predWithAnchor.map(e => e.date.getTime());
   const allTimes    = [...new Set([...actualTimes, ...predTimes])].sort((a, b) => a - b);
-
-  const allLabels = allTimes.map(t => fmtDate(new Date(t)));
+  const allLabels   = allTimes.map(t => fmtDate(new Date(t)));
 
   const actualMap = new Map(filteredEntries.map(e => [e.date.getTime(), e.hc]));
   const predMap   = new Map(predWithAnchor.map(e => [e.date.getTime(), e.hc]));
 
   const actualDataFull = allTimes.map(t => actualMap.has(t) ? actualMap.get(t) : null);
+  // spanGaps:true on pred so the dashed line is continuous even when prediction
+  // monthly dates are interleaved with actual-only dates (nulls in pred array)
   const predDataFull   = allTimes.map(t => predMap.has(t)   ? predMap.get(t)   : null);
 
   const actualDataset = {
@@ -487,7 +492,7 @@ function render() {
     pointHoverRadius: 4,
     tension: 0,
     fill: false,
-    spanGaps: false
+    spanGaps: true
   };
 
   // ── Update or create chart ───────────────────────────────────────────────
