@@ -23,6 +23,7 @@ let currentSourceCoverage = {
   unresolvedTurns: 0,
 };
 let sourceRefreshToken = 0;
+let sourceLoadController = null;
 
 const turnDataMemo = new Map();
 
@@ -224,7 +225,7 @@ function writeTurnCache(turnId, data) {
   } catch {}
 }
 
-async function fetchTurnData(turnId) {
+async function fetchTurnData(turnId, signal) {
   if (!turnId) return null;
   if (turnDataMemo.has(turnId)) return turnDataMemo.get(turnId);
 
@@ -234,7 +235,7 @@ async function fetchTurnData(turnId) {
     return cached;
   }
 
-  const res = await fetch('/api/turn?turnId=' + encodeURIComponent(turnId));
+  const res = await fetch('/api/turn?turnId=' + encodeURIComponent(turnId), { signal });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const json = await res.json();
   const normalized = normalizeTurnResponse(json);
@@ -287,9 +288,38 @@ function setStatus(msg, cls) {
   if (cls === 'ok') statusTimer = setTimeout(() => { statusEl.textContent = ''; }, 2800);
 }
 
-function setSourceStatus(msg, cls) {
-  sourceStatusEl.textContent = msg || '';
+function setSourceStatus(msg, cls, showCancel = false) {
+  sourceStatusEl.innerHTML = '';
   sourceStatusEl.className = 'ifonly-source-status' + (cls ? ' ' + cls : '');
+  
+  if (showCancel && sourceLoadController) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ifonly-source-status-wrapper';
+    
+    const spinner = document.createElement('div');
+    spinner.className = 'ifonly-loading-spinner';
+    wrapper.appendChild(spinner);
+    
+    const text = document.createElement('span');
+    text.textContent = msg || '';
+    wrapper.appendChild(text);
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'ifonly-cancel-btn';
+    cancelBtn.textContent = 'Annuller';
+    cancelBtn.onclick = () => {
+      if (sourceLoadController) {
+        sourceLoadController.abort();
+        sourceLoadController = null;
+        setSourceStatus('Annulleret', 'err');
+      }
+    };
+    wrapper.appendChild(cancelBtn);
+    
+    sourceStatusEl.appendChild(wrapper);
+  } else {
+    sourceStatusEl.textContent = msg || '';
+  }
 }
 
 function playerMatchesQuery(player, query) {
@@ -377,12 +407,12 @@ async function mapLimit(items, limit, iteratee) {
   return results;
 }
 
-async function summarizePlayerSources(player) {
+async function summarizePlayerSources(player, signal) {
   const relevantEntries = player.entries.filter(entry => entry.turnId);
   const turnIds = [...new Set(relevantEntries.map(entry => entry.turnId))];
   const turnResults = await mapLimit(turnIds, 6, async turnId => {
     try {
-      const turn = await fetchTurnData(turnId);
+      const turn = await fetchTurnData(turnId, signal);
       return { turnId, turn, error: null };
     } catch (error) {
       return { turnId, turn: null, error };
@@ -595,25 +625,43 @@ async function refreshSourceCatalog() {
   }
 
   sourceEl.disabled = true;
-  setSourceStatus('Analyserer linked players via turneringssider...', '');
-
-  const result = await summarizePlayerSources(currentPlayer);
-  if (token !== sourceRefreshToken) return;
-
-  currentSourceCatalog = result.sources;
-  currentPlayerEntrySources = result.entrySources;
-  currentSourceCoverage = result.coverage;
-  updateSourceOptions(currentSourceCatalog);
-
-  if (!currentSourceCatalog.length) {
-    setSourceStatus('Ingen linked players kunne udledes endnu. Uafklarede TurnIDs og ikke-understøttede turneringsformater er ikke medtaget.', 'err');
-    return;
+  
+  // Cancel any previous load and create new controller
+  if (sourceLoadController) {
+    sourceLoadController.abort();
   }
+  sourceLoadController = new AbortController();
+  
+  setSourceStatus('Henter turneringshistorik...', '', true);
 
-  setSourceStatus(
-    `${currentSourceCoverage.resolvedEntries} poster blev koblet til spillere via ${currentSourceCoverage.resolvedTurns} turneringer. ${currentSourceCoverage.unresolvedEntries} poster er stadig uafklarede.`,
-    'ok'
-  );
+  try {
+    const result = await summarizePlayerSources(currentPlayer, sourceLoadController.signal);
+    if (token !== sourceRefreshToken) return;
+
+    currentSourceCatalog = result.sources;
+    currentPlayerEntrySources = result.entrySources;
+    currentSourceCoverage = result.coverage;
+    updateSourceOptions(currentSourceCatalog);
+
+    if (!currentSourceCatalog.length) {
+      setSourceStatus('Ingen linked players kunne udledes endnu. Uafklarede TurnIDs og ikke-understøttede turneringsformater er ikke medtaget.', 'err');
+      return;
+    }
+
+    setSourceStatus(
+      `${currentSourceCoverage.resolvedEntries} poster blev koblet til spillere via ${currentSourceCoverage.resolvedTurns} turneringer. ${currentSourceCoverage.unresolvedEntries} poster er stadig uafklarede.`,
+      'ok'
+    );
+  } catch (err) {
+    if (token !== sourceRefreshToken) return;
+    if (err.name === 'AbortError') {
+      setSourceStatus('Annulleret', 'err');
+    } else {
+      setSourceStatus('Fejl ved indlæsning: ' + err.message, 'err');
+    }
+  } finally {
+    sourceLoadController = null;
+  }
 }
 
 function buildStateParams() {
