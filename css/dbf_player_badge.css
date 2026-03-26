@@ -1,3 +1,13 @@
+/* ── Theme variables (avoid color-mix() — html2canvas can't parse it) ──── */
+:root {
+  /* color-mix(in srgb, #14b8a6 16%, #201c18) */
+  --badge-header-tint: rgb(30, 53, 47);
+}
+[data-theme="light"] {
+  /* color-mix(in srgb, #0f766e 16%, #ffffff) */
+  --badge-header-tint: rgb(217, 233, 232);
+}
+
 /* ── Controls panel ──────────────────────────────────────── */
 .badge-controls {
   display: flex;
@@ -75,7 +85,7 @@
   padding: 1.25rem 1.5rem 1rem;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--accent) 16%, var(--surface-solid)),
+    var(--badge-header-tint),
     var(--surface-solid) 65%
   );
   border-bottom: 1px solid var(--border);
