@@ -7,13 +7,22 @@ Live site:
 
 ## What It Does
 
-This project provides two browser-based analyzers:
+This project provides five browser-based analyzers:
 
-1. Handicap comparison
+1. **Handicap comparison**
    Compare handicap development for multiple DBf players over time.
 
-2. Handicap distribution
+2. **Handicap distribution**
    Explore handicap distribution across clubs and inspect summary statistics.
+
+3. **Player badge**
+   Generate a shareable badge for a single player with HC history, forecast via linear regression, stability score, and national/club percentile.
+
+4. **If-Only analyzer**
+   Replay your HC history excluding a specific club or partner to see the alternative trajectory. Supports both club-based and player-based exclusions with partner inference from tournament data.
+
+5. **Hvor & Hvem (Where & Who)**
+   Explore where a player has played and with whom. Expandable partner tree with club, tournament title, HC adjustments, and direct links to bridge.dk. Cross-reference partners by location and locations by partner.
 
 The site is built as static pages with Eleventy and uses a small Node relay for DBf requests so the browser can fetch data without CORS issues.
 
@@ -22,6 +31,9 @@ The site is built as static pages with Eleventy and uses a small Node relay for 
 - `/`: Dashboard
 - `/tools/handicap-comparison/`: Player handicap comparison
 - `/tools/handicap-distribution/`: Handicap distribution by club
+- `/tools/player-badge/`: Player badge with HC forecast
+- `/tools/if-only/`: If-Only analyzer
+- `/tools/where-played/`: Hvor & Hvem
 
 ## How To Use
 
@@ -40,6 +52,32 @@ The site is built as static pages with Eleventy and uses a small Node relay for 
 - Filter by club and handicap interval
 - Adjust the number of bins in the histogram
 - Switch between count, percentage, cumulative curve, and trendline views
+
+### Player badge
+
+- Open `/tools/player-badge/`
+- Search for a player by name or DBf number
+- View HC history with adjustable date range
+- Forecast future HC via linear regression with optimism slider
+- See stability score and national/club percentile
+
+### If-Only analyzer
+
+- Open `/tools/if-only/`
+- Search for a player by name or DBf number
+- Toggle between club and player exclusion mode
+- Select a club or partner to exclude
+- Compare the actual HC curve with the alternative trajectory
+- Share via URL with preselected player and source
+
+### Hvor & Hvem
+
+- Open `/tools/where-played/`
+- Search for a player by name or DBf number
+- Browse the partner list with total count and summed HC effect
+- Expand a partner row to see individual tournaments with date, club, title, and HC adjustment
+- View all locations with tournament count
+- Cross-reference: select a location to see partners, or a partner to see locations
 
 ## Run Locally
 
@@ -71,8 +109,10 @@ Useful dev commands:
 
 The frontend uses local relay endpoints exposed by the Node server:
 
-- `GET /api/hacalle`
-- `GET /api/lookup?dbfNr=78976`
+- `GET /api/hacalle` — all players with current HC
+- `GET /api/lookup?dbfNr=78976` — individual player HC history
+- `GET /api/turn?turnId=12345` — single tournament details
+- `POST /api/turns` — batch tournament details (JSON body: `{ "ids": [...] }`)
 
 These endpoints proxy DBf sources so the tools can fetch data from the browser without cross-origin issues.
 
