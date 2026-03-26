@@ -365,6 +365,63 @@ function parseTurnHtml(html) {
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
 
+  if (reqUrl.pathname === '/api/turns' && req.method === 'POST') {
+    // Read JSON body
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    let body;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString());
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON body' });
+      return;
+    }
+    const rawIds = Array.isArray(body.ids) ? body.ids : [];
+    const turnIds = [...new Set(rawIds.map(s => String(s).replace(/\D/g, '')).filter(Boolean))];
+    if (!turnIds.length) {
+      sendJson(res, 400, { error: 'Missing ids array in body' });
+      return;
+    }
+
+    const now = Date.now();
+    const BATCH_CONCURRENCY = 8;
+
+    async function fetchOneTurn(turnId) {
+      const cached = turnCache.get(turnId);
+      if (cached && now - cached.ts <= TURN_CACHE_MAX_AGE_MS) {
+        return { turnId, ...cached.data, cachedAt: cached.ts, cache: 'HIT' };
+      }
+      try {
+        const upstream = await fetch(`${TURN_BASE_URL}?TurnID=${encodeURIComponent(turnId)}`, {
+          method: 'GET',
+          headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+        });
+        if (!upstream.ok) {
+          return { turnId, error: 'Upstream fetch failed', status: upstream.status };
+        }
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        const data = parseTurnHtml(decodeWindows1252(buffer));
+        turnCache.set(turnId, { ts: now, data });
+        return { turnId, ...data, cachedAt: now, cache: 'MISS' };
+      } catch (err) {
+        return { turnId, error: 'Relay request failed', message: err.message };
+      }
+    }
+
+    const results = new Array(turnIds.length);
+    let nextIdx = 0;
+    async function worker() {
+      while (nextIdx < turnIds.length) {
+        const i = nextIdx++;
+        results[i] = await fetchOneTurn(turnIds[i]);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, turnIds.length) }, () => worker()));
+
+    sendJson(res, 200, { results });
+    return;
+  }
+
   if (req.method !== 'GET') {
     sendJson(res, 405, { error: 'Method not allowed' });
     return;
@@ -484,4 +541,5 @@ server.listen(PORT, HOST, () => {
   console.log('Handicap comparison:', `${base}/tools/handicap-comparison/`);
   console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
   console.log('If-Only analyzer:', `${base}/tools/if-only/`);
+  console.log('Where & Played:', `${base}/tools/where-played/`);
 });

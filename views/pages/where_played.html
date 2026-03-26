@@ -1,0 +1,125 @@
+---
+layout: base.hbs
+title: Hvor & Hvem-analyse
+ogTitle: Hvor & Hvem-analyse
+description: Udforsk hvor du har spillet, med hvem og hvor mange gange — baseret på turneringshistorik fra DBf.
+appleTitle: Hvor & Hvem
+stylesheets:
+  - /css/analyzer-theme.css
+  - /css/dbf_where_played.css
+bodyScripts:
+  - /js/utils.js
+  - /js/dbf_where_played.js
+  - /js/theme.js
+permalink: /tools/where-played/index.html
+---
+<main class="page">
+<header>
+  {{> analyzer_header headerRowClass="page-header" title="Hvor & Hvem-analyse" titleClass="page-title" subtitle="Udforsk dine turneringslokationer og makkere baseret på turneringshistorik." subtitleClass="page-subtitle"}}
+</header>
+
+<div class="wp-controls">
+  <div class="wp-control-row">
+    <div class="wp-search-group">
+      <span class="lbl">Spiller</span>
+      <div class="autocomplete-wrapper">
+        <input type="text" id="wp-search" placeholder="Søg efter spiller..." autocomplete="off" aria-label="Søg spiller">
+        <div class="autocomplete-dropdown" id="wp-dropdown" style="display:none"></div>
+      </div>
+    </div>
+    <span class="fetch-status" id="wp-status"></span>
+  </div>
+  <div class="wp-control-row">
+    <span class="wp-load-status" id="wp-load-status"></span>
+  </div>
+</div>
+
+<div class="wp-empty" id="wp-empty">Søg efter en spiller for at se turneringslokationer og makkere.</div>
+
+<div class="wp-wrap" id="wp-wrap" style="display:none">
+  <section class="wp-overview card">
+    <div class="wp-overview-main">
+      <div>
+        <h2 class="wp-player" id="wp-player"></h2>
+        <p class="wp-player-meta" id="wp-player-meta"></p>
+      </div>
+      <div class="wp-overview-side">
+        <p class="wp-overview-label">Analyseoversigt</p>
+        <p class="wp-overview-value" id="wp-summary"></p>
+        <p class="wp-overview-sub" id="wp-coverage"></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="wp-stats" id="wp-stats"></div>
+
+  <div class="wp-tabs">
+    <button class="wp-tab wp-tab-active" data-tab="partners">Makkere (total)</button>
+    <button class="wp-tab" data-tab="locations">Lokationer (total)</button>
+    <button class="wp-tab" data-tab="location-detail">Lokation → Makkere</button>
+    <button class="wp-tab" data-tab="partner-detail">Makker → Lokationer</button>
+  </div>
+
+  <section class="wp-panel card" id="wp-panel-partners">
+    <div class="wp-panel-head">
+      <h3>Makkere</h3>
+      <p class="wp-panel-sub">Alle makkere sorteret efter antal turneringer sammen.</p>
+    </div>
+    <div class="wp-table-wrap">
+      <table class="wp-table" id="wp-table-partners">
+        <thead><tr><th>Makker</th><th>Turneringer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wp-panel card" id="wp-panel-locations" style="display:none">
+    <div class="wp-panel-head">
+      <h3>Lokationer</h3>
+      <p class="wp-panel-sub">Alle turneringslokationer sorteret efter antal besøg.</p>
+    </div>
+    <div class="wp-table-wrap">
+      <table class="wp-table" id="wp-table-locations">
+        <thead><tr><th>Lokation</th><th>Turneringer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wp-panel card" id="wp-panel-location-detail" style="display:none">
+    <div class="wp-panel-head">
+      <h3>Lokation → Makkere</h3>
+      <p class="wp-panel-sub">Vælg en lokation for at se hvem du har spillet med der.</p>
+      <select id="wp-location-select" class="wp-detail-select">
+        <option value="">Vælg lokation...</option>
+      </select>
+    </div>
+    <div class="wp-table-wrap">
+      <table class="wp-table" id="wp-table-location-detail">
+        <thead><tr><th>Makker</th><th>Turneringer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wp-panel card" id="wp-panel-partner-detail" style="display:none">
+    <div class="wp-panel-head">
+      <h3>Makker → Lokationer</h3>
+      <p class="wp-panel-sub">Vælg en makker for at se hvor I har spillet sammen.</p>
+      <select id="wp-partner-select" class="wp-detail-select">
+        <option value="">Vælg makker...</option>
+      </select>
+    </div>
+    <div class="wp-table-wrap">
+      <table class="wp-table" id="wp-table-partner-detail">
+        <thead><tr><th>Lokation</th><th>Turneringer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="wp-note" id="wp-note">Data er baseret på turneringssider fra DBf. Kun turneringer i par- eller holdformat med kendt spillerplacering kan bruges til at udlede makkere. Turneringer uden disse oplysninger tæller kun som lokationsbesøg.</p>
+</div>
+
+{{> footer wrapperClass="page-footer"}}
+</main>
