@@ -1,7 +1,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const LOOKUP_CACHE_PREFIX        = 'dbf_lookup_';
 const LOOKUP_CACHE_MAX_AGE_MS    = 12 * 60 * 60 * 1000;
-const ALL_PLAYERS_CACHE_KEY      = 'dbf_all_players_cache_v1';
+const ALL_PLAYERS_CACHE_KEY      = 'dbf_all_players_cache_v2';
 const ALL_PLAYERS_CACHE_MAX_AGE  = 12 * 60 * 60 * 1000;
 const BADGE_COLOR                = '#378ADD';
 const PRED_COLOR                 = '#f59e0b';
@@ -62,9 +62,9 @@ function readAllPlayersCache() {
     const raw = localStorage.getItem(ALL_PLAYERS_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || !parsed.ts || !parsed.players) return null;
+    if (!parsed || !parsed.ts || !Array.isArray(parsed.players)) return null;
     if (Date.now() - parsed.ts > ALL_PLAYERS_CACHE_MAX_AGE) return null;
-    return parsed.players;
+    return normalizePlayers(parsed.players);
   } catch { return null; }
 }
 
@@ -75,6 +75,27 @@ function writeAllPlayersCache(players) {
   } catch { /* ignore */ }
 }
 
+function normalizePlayers(players) {
+  if (!Array.isArray(players)) return null;
+
+  const normalized = players
+    .map(player => {
+      if (!player || typeof player !== 'object') return null;
+      const hc = typeof player.hc === 'number' ? player.hc : parseFloat(String(player.hc ?? '').replace(',', '.'));
+      const dbfNr = String(player.dbfNr ?? '').replace(/\D/g, '');
+      if (!Number.isFinite(hc) || !dbfNr) return null;
+      return {
+        name: typeof player.name === 'string' ? player.name : '',
+        club: typeof player.club === 'string' ? player.club : '',
+        dbfNr,
+        hc,
+      };
+    })
+    .filter(Boolean);
+
+  return normalized.length ? normalized : null;
+}
+
 async function fetchAllPlayers() {
   if (allPlayersData) return allPlayersData;
   const cached = readAllPlayersCache();
@@ -82,7 +103,7 @@ async function fetchAllPlayers() {
   const res = await fetch('/api/hacalle');
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const json = await res.json();
-  allPlayersData = json.players || [];
+  allPlayersData = normalizePlayers(json.players) || [];
   writeAllPlayersCache(allPlayersData);
   return allPlayersData;
 }

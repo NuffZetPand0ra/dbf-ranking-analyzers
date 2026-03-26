@@ -10,7 +10,7 @@ let showHover = true;
 const LOOKUP_BASE_URL = '/api/lookup';
 const LOOKUP_CACHE_PREFIX = 'dbf_lookup_';
 const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const ALL_PLAYERS_CACHE_KEY = 'dbf_all_players_cache_v1';
+const ALL_PLAYERS_CACHE_KEY = 'dbf_all_players_cache_v2';
 const ALL_PLAYERS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 const btnPoints = document.getElementById('toggle-points');
@@ -751,7 +751,7 @@ function readAllPlayersCache() {
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.ts || !Array.isArray(parsed.players)) return null;
     if (Date.now() - parsed.ts > ALL_PLAYERS_CACHE_MAX_AGE_MS) return null;
-    return parsed.players;
+    return normalizePlayers(parsed.players);
   } catch (_) {
     return null;
   }
@@ -764,6 +764,27 @@ function writeAllPlayersCache(playersList) {
       players: playersList
     }));
   } catch (_) {}
+}
+
+function normalizePlayers(playersList) {
+  if (!Array.isArray(playersList)) return null;
+
+  const normalized = playersList
+    .map(player => {
+      if (!player || typeof player !== 'object') return null;
+      const hc = typeof player.hc === 'number' ? player.hc : parseFloat(String(player.hc ?? '').replace(',', '.'));
+      const dbfNr = String(player.dbfNr ?? '').replace(/\D/g, '');
+      if (!Number.isFinite(hc) || !dbfNr) return null;
+      return {
+        name: typeof player.name === 'string' ? player.name : '',
+        club: typeof player.club === 'string' ? player.club : '',
+        dbfNr,
+        hc,
+      };
+    })
+    .filter(Boolean);
+
+  return normalized.length ? normalized : null;
 }
 
 function clearClientCaches() {
@@ -965,9 +986,9 @@ async function fetchAllPlayers() {
     const res = await fetch('/api/hacalle');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    allPlayersCache = data.players;
-    writeAllPlayersCache(data.players);
-    return data.players;
+    allPlayersCache = normalizePlayers(data.players) || [];
+    writeAllPlayersCache(allPlayersCache);
+    return allPlayersCache;
   } catch (err) {
     console.error('Error fetching player list:', err);
     return [];
