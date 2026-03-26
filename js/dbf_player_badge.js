@@ -5,6 +5,10 @@ const ALL_PLAYERS_CACHE_KEY      = 'dbf_all_players_cache_v2';
 const ALL_PLAYERS_CACHE_MAX_AGE  = 12 * 60 * 60 * 1000;
 const BADGE_COLOR                = '#378ADD';
 const PRED_COLOR                 = '#f59e0b';
+const EMBED_IFRAME_HEIGHT        = 640;
+
+const initialParams = new URLSearchParams(window.location.search);
+const isEmbedMode = initialParams.get('embed') === '1' || initialParams.get('widget') === '1';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentPlayer    = null;   // { name, dbfNr, club, entries:[{date:Date, hc}] }
@@ -25,6 +29,8 @@ const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
 const optValEl      = document.getElementById('badge-opt-val');
 const hoverBtnEl    = document.getElementById('badge-toggle-hover');
+const embedUrlBtnEl = document.getElementById('badge-embed-url-btn');
+const embedBtnEl    = document.getElementById('badge-embed-btn');
 const shareBtnEl    = document.getElementById('badge-share-btn');
 const exportBtnEl   = document.getElementById('badge-export-btn');
 const emptyEl       = document.getElementById('badge-empty');
@@ -416,6 +422,21 @@ function applyHoverState() {
   chart.update('none');
 }
 
+function applyPageMode() {
+  document.body.classList.toggle('badge-embed-mode', isEmbedMode);
+  if (isEmbedMode) {
+    emptyEl.textContent = 'Angiv ?p=DBfNr i widget-linket for at vise et spillerbadge.';
+  }
+}
+
+function notifyEmbedHeight() {
+  if (!isEmbedMode || window.parent === window) return;
+  window.parent.postMessage({
+    type: 'dbf-player-badge:height',
+    height: Math.ceil(document.documentElement.scrollHeight)
+  }, '*');
+}
+
 // ── Date formatting ───────────────────────────────────────────────────────────
 function fmtDate(d) {
   return d.toLocaleDateString('da-DK', { day: '2-digit', month: 'short', year: '2-digit' });
@@ -452,6 +473,7 @@ function render() {
   if (!currentPlayer) {
     emptyEl.style.display = '';
     wrapEl.style.display  = 'none';
+    notifyEmbedHeight();
     return;
   }
 
@@ -679,11 +701,14 @@ function render() {
     });
     qr.append(qrEl);
   }
+
+  notifyEmbedHeight();
 }
 
 // ── URL state ─────────────────────────────────────────────────────────────────
-function buildStateParams() {
+function buildStateParams({ includeEmbed = isEmbedMode } = {}) {
   const p = new URLSearchParams();
+  if (includeEmbed) p.set('embed', '1');
   if (currentPlayer) p.set('p', currentPlayer.dbfNr);
   if (fromEl.value) p.set('from', fromEl.value);
   if (toEl.value)   p.set('to', toEl.value);
@@ -703,6 +728,11 @@ function syncUrl() {
   const qs  = buildStateParams().toString();
   const rel = window.location.pathname + (qs ? '?' + qs : '');
   window.history.replaceState({}, '', rel);
+}
+
+function buildPageUrl({ includeEmbed = false } = {}) {
+  const qs = buildStateParams({ includeEmbed }).toString();
+  return window.location.origin + window.location.pathname + (qs ? '?' + qs : '');
 }
 
 async function restoreStateFromUrl() {
@@ -737,12 +767,46 @@ async function restoreStateFromUrl() {
 
 // ── Share / export ────────────────────────────────────────────────────────────
 function copyShareUrl() {
-  navigator.clipboard.writeText(window.location.href).then(() => {
+  navigator.clipboard.writeText(buildPageUrl()).then(() => {
     const orig = shareBtnEl.textContent;
     shareBtnEl.textContent = '✓ Kopieret!';
     setTimeout(() => { shareBtnEl.textContent = orig; }, 2000);
   }).catch(() => {
-    prompt('Kopier dette link:', window.location.href);
+    prompt('Kopier dette link:', buildPageUrl());
+  });
+}
+
+function copyEmbedCode() {
+  if (!currentPlayer) {
+    setStatus('Vælg en spiller først', 'err');
+    return;
+  }
+
+  const embedUrl = buildPageUrl({ includeEmbed: true });
+  const code = `<iframe src="${embedUrl}" loading="lazy" title="DBf Spillerbadge" style="width:100%;max-width:740px;height:${EMBED_IFRAME_HEIGHT}px;border:0;overflow:hidden;"></iframe>`;
+
+  navigator.clipboard.writeText(code).then(() => {
+    const orig = embedBtnEl.textContent;
+    embedBtnEl.textContent = '✓ Iframe kopieret!';
+    setTimeout(() => { embedBtnEl.textContent = orig; }, 2000);
+  }).catch(() => {
+    prompt('Kopier denne iframe-kode:', code);
+  });
+}
+
+function copyEmbedUrl() {
+  if (!currentPlayer) {
+    setStatus('Vælg en spiller først', 'err');
+    return;
+  }
+
+  const embedUrl = buildPageUrl({ includeEmbed: true });
+  navigator.clipboard.writeText(embedUrl).then(() => {
+    const orig = embedUrlBtnEl.textContent;
+    embedUrlBtnEl.textContent = '✓ Embed link kopieret!';
+    setTimeout(() => { embedUrlBtnEl.textContent = orig; }, 2000);
+  }).catch(() => {
+    prompt('Kopier dette embed-link:', embedUrl);
   });
 }
 
@@ -819,13 +883,21 @@ if (hoverBtnEl) {
   });
 }
 
+if (embedBtnEl) {
+  embedBtnEl.addEventListener('click', copyEmbedCode);
+}
+
+if (embedUrlBtnEl) {
+  embedUrlBtnEl.addEventListener('click', copyEmbedUrl);
+}
+
 shareBtnEl.addEventListener('click', copyShareUrl);
 exportBtnEl.addEventListener('click', exportBadge);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 // Set default dates to last 1 year when no URL state is present
 (function initDefaults() {
-  const params = new URLSearchParams(window.location.search);
+  const params = initialParams;
   if (!params.get('from')) {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -836,7 +908,11 @@ exportBtnEl.addEventListener('click', exportBadge);
   }
 })();
 
+applyPageMode();
+window.addEventListener('resize', notifyEmbedHeight);
+
 restoreStateFromUrl().finally(() => {
   // Pre-warm player list in background
   fetchAllPlayers().catch(() => {});
+  notifyEmbedHeight();
 });
