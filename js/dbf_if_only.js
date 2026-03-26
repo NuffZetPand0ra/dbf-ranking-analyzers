@@ -1,5 +1,7 @@
 const LOOKUP_CACHE_PREFIX = 'dbf_lookup_if_only_v2_';
 const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const TURN_CACHE_PREFIX = 'dbf_turn_if_only_v1_';
+const TURN_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const ALL_PLAYERS_CACHE_KEY = 'dbf_all_players_cache_v2';
 const ALL_PLAYERS_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const ACTUAL_COLOR = '#378ADD';
@@ -11,11 +13,26 @@ let chart = null;
 let autocompleteIndex = -1;
 let isRestoringState = false;
 let currentSource = new URLSearchParams(window.location.search).get('exclude') || '';
+let currentSourceType = new URLSearchParams(window.location.search).get('src') === 'player' ? 'player' : 'club';
+let currentSourceCatalog = [];
+let currentPlayerEntrySources = new Map();
+let currentSourceCoverage = {
+  resolvedEntries: 0,
+  unresolvedEntries: 0,
+  resolvedTurns: 0,
+  unresolvedTurns: 0,
+};
+let sourceRefreshToken = 0;
+
+const turnDataMemo = new Map();
 
 const searchEl = document.getElementById('ifonly-search');
 const dropdownEl = document.getElementById('ifonly-dropdown');
 const statusEl = document.getElementById('ifonly-status');
+const sourceTypeEl = document.getElementById('ifonly-source-type');
 const sourceEl = document.getElementById('ifonly-source');
+const hintEl = document.getElementById('ifonly-hint');
+const sourceStatusEl = document.getElementById('ifonly-source-status');
 const shareBtnEl = document.getElementById('ifonly-share-btn');
 const emptyEl = document.getElementById('ifonly-empty');
 const wrapEl = document.getElementById('ifonly-wrap');
@@ -40,6 +57,10 @@ function fmtDate(d) {
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   return `${day}/${month}/${d.getFullYear()}`;
+}
+
+function normalizeName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 function normalizePlayers(players) {
@@ -111,6 +132,48 @@ function normalizeLookupResponse(data) {
   };
 }
 
+function normalizeTurnResponse(data) {
+  if (!data || typeof data !== 'object') return null;
+  const groups = Array.isArray(data.groups)
+    ? data.groups.map((group, index) => {
+        if (!group || typeof group !== 'object' || !Array.isArray(group.players)) return null;
+        const players = group.players
+          .map(player => {
+            if (!player || typeof player !== 'object') return null;
+            const name = String(player.name || '').replace(/\s+/g, ' ').trim();
+            if (!name) return null;
+            return {
+              name,
+              direction: typeof player.direction === 'string' ? player.direction : '',
+              startHandicap: parseNumber(player.startHandicap),
+              score: parseNumber(player.score),
+              handicapScore: parseNumber(player.handicapScore),
+            };
+          })
+          .filter(Boolean);
+        if (!players.length) return null;
+        return {
+          groupKey: String(group.groupKey || `group-${index + 1}`),
+          opponentGroupKey: group.opponentGroupKey ? String(group.opponentGroupKey) : null,
+          score: parseNumber(group.score),
+          handicapScore: parseNumber(group.handicapScore),
+          players,
+        };
+      })
+      .filter(Boolean)
+    : [];
+
+  return {
+    title: String(data.title || '').trim(),
+    organizer: String(data.organizer || '').trim(),
+    playedAt: String(data.playedAt || '').trim(),
+    postedAt: String(data.postedAt || '').trim(),
+    formatHint: data.formatHint === 'pair' || data.formatHint === 'team-known-seating' ? data.formatHint : 'unknown',
+    relationshipConfidence: typeof data.relationshipConfidence === 'string' ? data.relationshipConfidence : 'none',
+    groups,
+  };
+}
+
 function readLookupCache(dbfNr) {
   try {
     const raw = localStorage.getItem(LOOKUP_CACHE_PREFIX + dbfNr);
@@ -140,6 +203,46 @@ async function fetchLookupData(dbfNr) {
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const json = await res.json();
   return normalizeLookupResponse(json);
+}
+
+function readTurnCache(turnId) {
+  try {
+    const raw = localStorage.getItem(TURN_CACHE_PREFIX + turnId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || !parsed.data) return null;
+    if (Date.now() - parsed.ts > TURN_CACHE_MAX_AGE_MS) return null;
+    return normalizeTurnResponse(parsed.data);
+  } catch {
+    return null;
+  }
+}
+
+function writeTurnCache(turnId, data) {
+  try {
+    localStorage.setItem(TURN_CACHE_PREFIX + turnId, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+
+async function fetchTurnData(turnId) {
+  if (!turnId) return null;
+  if (turnDataMemo.has(turnId)) return turnDataMemo.get(turnId);
+
+  const cached = readTurnCache(turnId);
+  if (cached) {
+    turnDataMemo.set(turnId, cached);
+    return cached;
+  }
+
+  const res = await fetch('/api/turn?turnId=' + encodeURIComponent(turnId));
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  const normalized = normalizeTurnResponse(json);
+  if (normalized) {
+    writeTurnCache(turnId, normalized);
+    turnDataMemo.set(turnId, normalized);
+  }
+  return normalized;
 }
 
 function readAllPlayersCache() {
@@ -182,6 +285,11 @@ function setStatus(msg, cls) {
   statusEl.className = 'fetch-status' + (cls ? ' ' + cls : '');
   clearTimeout(statusTimer);
   if (cls === 'ok') statusTimer = setTimeout(() => { statusEl.textContent = ''; }, 2800);
+}
+
+function setSourceStatus(msg, cls) {
+  sourceStatusEl.textContent = msg || '';
+  sourceStatusEl.className = 'ifonly-source-status' + (cls ? ' ' + cls : '');
 }
 
 function playerMatchesQuery(player, query) {
@@ -235,7 +343,7 @@ async function handleSearchInput() {
   } catch {}
 }
 
-function summarizeSources(entries) {
+function summarizeClubSources(entries) {
   const map = new Map();
   for (const entry of entries) {
     const label = entry.sourceLabel || entry.club;
@@ -250,6 +358,113 @@ function summarizeSources(entries) {
     item.tournamentKeys.add(entry.turnId || `${entry.dateIso}|${entry.tournament}`);
   }
   return [...map.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'da'));
+}
+
+async function mapLimit(items, limit, iteratee) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await iteratee(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+async function summarizePlayerSources(player) {
+  const relevantEntries = player.entries.filter(entry => entry.turnId);
+  const turnIds = [...new Set(relevantEntries.map(entry => entry.turnId))];
+  const turnResults = await mapLimit(turnIds, 6, async turnId => {
+    try {
+      const turn = await fetchTurnData(turnId);
+      return { turnId, turn, error: null };
+    } catch (error) {
+      return { turnId, turn: null, error };
+    }
+  });
+
+  const playerKey = normalizeName(player.name);
+  const resolvedPartnersByTurn = new Map();
+  const coverage = {
+    resolvedEntries: 0,
+    unresolvedEntries: 0,
+    resolvedTurns: 0,
+    unresolvedTurns: 0,
+  };
+
+  for (const result of turnResults) {
+    if (result.error || !result.turn || !result.turn.groups.length) {
+      coverage.unresolvedTurns += 1;
+      continue;
+    }
+
+    let linkedPlayers = null;
+    if (result.turn.formatHint === 'pair') {
+      for (const group of result.turn.groups) {
+        if (!group.players.some(groupPlayer => normalizeName(groupPlayer.name) === playerKey)) continue;
+        linkedPlayers = group.players
+          .map(groupPlayer => groupPlayer.name)
+          .filter(name => normalizeName(name) !== playerKey);
+        break;
+      }
+    } else if (result.turn.formatHint === 'team-known-seating') {
+      for (const group of result.turn.groups) {
+        const self = group.players.find(groupPlayer => normalizeName(groupPlayer.name) === playerKey);
+        if (!self) continue;
+        const selfDirection = String(self.direction || '').trim().toLowerCase();
+        linkedPlayers = group.players
+          .filter(groupPlayer => normalizeName(groupPlayer.name) !== playerKey)
+          .filter(groupPlayer => String(groupPlayer.direction || '').trim().toLowerCase() === selfDirection)
+          .map(groupPlayer => groupPlayer.name);
+        break;
+      }
+    }
+
+    if (linkedPlayers && linkedPlayers.length) {
+      resolvedPartnersByTurn.set(result.turnId, [...new Set(linkedPlayers)]);
+      coverage.resolvedTurns += 1;
+    } else {
+      coverage.unresolvedTurns += 1;
+    }
+  }
+
+  const entrySources = new Map();
+  const sourceMap = new Map();
+
+  for (const entry of player.entries) {
+    const linkedPlayers = entry.turnId ? resolvedPartnersByTurn.get(entry.turnId) : null;
+    if (!linkedPlayers || !linkedPlayers.length) {
+      coverage.unresolvedEntries += 1;
+      continue;
+    }
+
+    coverage.resolvedEntries += 1;
+    const labels = new Set(linkedPlayers);
+    entrySources.set(entry.id, labels);
+
+    for (const label of labels) {
+      let item = sourceMap.get(label);
+      if (!item) {
+        item = { label, count: 0, totalChange: 0, tournamentKeys: new Set() };
+        sourceMap.set(label, item);
+      }
+      item.count += 1;
+      item.totalChange += typeof entry.change === 'number' ? entry.change : 0;
+      item.tournamentKeys.add(entry.turnId || `${entry.dateIso}|${entry.tournament}`);
+    }
+  }
+
+  return {
+    sources: [...sourceMap.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'da')),
+    entrySources,
+    coverage,
+  };
 }
 
 function formatSigned(value) {
@@ -288,7 +503,9 @@ function buildScenario(player, excludedSource) {
   for (const entry of player.entries) {
     actualPoints.push({ x: entry.date.getTime(), y: entry.hc, entry });
 
-    const isExcluded = Boolean(excludedSource) && entry.sourceLabel === excludedSource;
+    const isExcluded = currentSourceType === 'player'
+      ? Boolean(excludedSource) && currentPlayerEntrySources.get(entry.id)?.has(excludedSource)
+      : Boolean(excludedSource) && entry.sourceLabel === excludedSource;
     if (isExcluded) {
       excludedCount += 1;
       if (typeof entry.change === 'number') excludedChange += entry.change;
@@ -345,11 +562,65 @@ function updateSourceOptions(sources) {
   sourceEl.value = currentSource;
 }
 
+function updateHint() {
+  hintEl.textContent = currentSourceType === 'player'
+    ? 'Spiller-mode bruger TurnID-opslag og udleder linked players fra par-tabeller og holdtabeller med kendt spillerplacering. Turneringer uden sikker kobling markeres som uafklarede.'
+    : 'Klub-mode bruger den rå DBf-historik direkte. Spiller-mode forsøger at udlede linked players via turneringssiderne.';
+}
+
+async function refreshSourceCatalog() {
+  updateHint();
+  currentSourceCatalog = [];
+  currentPlayerEntrySources = new Map();
+  currentSourceCoverage = {
+    resolvedEntries: 0,
+    unresolvedEntries: 0,
+    resolvedTurns: 0,
+    unresolvedTurns: 0,
+  };
+
+  if (!currentPlayer) {
+    updateSourceOptions([]);
+    setSourceStatus('', '');
+    return;
+  }
+
+  const token = ++sourceRefreshToken;
+
+  if (currentSourceType === 'club') {
+    currentSourceCatalog = summarizeClubSources(currentPlayer.entries);
+    updateSourceOptions(currentSourceCatalog);
+    setSourceStatus('', '');
+    return;
+  }
+
+  sourceEl.disabled = true;
+  setSourceStatus('Analyserer linked players via turneringssider...', '');
+
+  const result = await summarizePlayerSources(currentPlayer);
+  if (token !== sourceRefreshToken) return;
+
+  currentSourceCatalog = result.sources;
+  currentPlayerEntrySources = result.entrySources;
+  currentSourceCoverage = result.coverage;
+  updateSourceOptions(currentSourceCatalog);
+
+  if (!currentSourceCatalog.length) {
+    setSourceStatus('Ingen linked players kunne udledes endnu. Uafklarede TurnIDs og ikke-understøttede turneringsformater er ikke medtaget.', 'err');
+    return;
+  }
+
+  setSourceStatus(
+    `${currentSourceCoverage.resolvedEntries} poster blev koblet til spillere via ${currentSourceCoverage.resolvedTurns} turneringer. ${currentSourceCoverage.unresolvedEntries} poster er stadig uafklarede.`,
+    'ok'
+  );
+}
+
 function buildStateParams() {
   const params = new URLSearchParams();
   if (currentPlayer) params.set('p', currentPlayer.dbfNr);
+  if (currentSourceType !== 'club') params.set('src', currentSourceType);
   if (currentSource) {
-    params.set('src', 'club');
     params.set('exclude', currentSource);
   }
   return params;
@@ -374,8 +645,6 @@ function render() {
     return;
   }
 
-  const sources = summarizeSources(currentPlayer.entries);
-  updateSourceOptions(sources);
   const scenario = buildScenario(currentPlayer, currentSource);
   const deltaCurrent = round2(scenario.altCurrent - scenario.actualCurrent);
   const excludedPct = currentPlayer.entries.length ? Math.round((scenario.excludedCount / currentPlayer.entries.length) * 100) : 0;
@@ -384,13 +653,21 @@ function render() {
   playerEl.textContent = currentPlayer.name;
   playerMetaEl.textContent = [currentPlayer.club, '#' + currentPlayer.dbfNr].filter(Boolean).join(' · ');
   sourceNameEl.textContent = currentSource ? `Hvis bare uden ${currentSource}` : 'Ingen kilde ekskluderet';
-  sourceDetailEl.textContent = currentSource
-    ? `${scenario.excludedCount} posteringer på tværs af ${scenario.excludedTournaments} turneringer er udeladt i den alternative bane.`
-    : 'Vælg en kilde for at sammenligne den faktiske kurve med en alternativ delta-bane.';
-
-  noteEl.textContent = currentSource
-    ? `Alternativ udvikling er beregnet ved at afspille historikken igen uden ${currentSource}. Modellen er baseret på relative deltas og beskriver ikke nødvendigvis, hvad der faktisk ville være sket.`
-    : 'Vælg en kilde for at se en alternativ HC-bane. Analysen er bevidst formuleret som en delta-baseret model, ikke som en sikker kontrafaktisk sandhed.';
+  if (currentSourceType === 'player') {
+    sourceDetailEl.textContent = currentSource
+      ? `${scenario.excludedCount} posteringer med linked player ${currentSource} på tværs af ${scenario.excludedTournaments} turneringer er udeladt. ${currentSourceCoverage.unresolvedEntries} poster kunne ikke kobles sikkert til en spiller.`
+      : 'Vælg en linked player for at sammenligne den faktiske kurve med en alternativ bane baseret på par- og holdkoblinger.';
+    noteEl.textContent = currentSource
+      ? `Alternativ udvikling er beregnet ved at afspille historikken igen uden poster, der i parsede turneringssider er koblet til ${currentSource}. For hold med kendt spillerplacering bruges makkeren i samme retning. Det er en model baseret på registrerede koblinger, ikke en sikker påstand om årsag.`
+      : 'Vælg en linked player for at se en alternativ HC-bane. Kun turneringer med sikker spillerkobling indgår; resten markeres som uafklarede.';
+  } else {
+    sourceDetailEl.textContent = currentSource
+      ? `${scenario.excludedCount} posteringer på tværs af ${scenario.excludedTournaments} turneringer er udeladt i den alternative bane.`
+      : 'Vælg en kilde for at sammenligne den faktiske kurve med en alternativ delta-bane.';
+    noteEl.textContent = currentSource
+      ? `Alternativ udvikling er beregnet ved at afspille historikken igen uden ${currentSource}. Modellen er baseret på relative deltas og beskriver ikke nødvendigvis, hvad der faktisk ville være sket.`
+      : 'Vælg en kilde for at se en alternativ HC-bane. Analysen er bevidst formuleret som en delta-baseret model, ikke som en sikker kontrafaktisk sandhed.';
+  }
 
   statsEl.innerHTML = '';
   statsEl.append(
@@ -509,6 +786,7 @@ async function loadPlayer(dbfNr) {
       club,
     };
 
+    await refreshSourceCatalog();
     setStatus('Indlæst: ' + data.name, 'ok');
     render();
   } catch (err) {
@@ -538,6 +816,9 @@ async function restoreStateFromUrl() {
 
   isRestoringState = true;
   try {
+    currentSourceType = params.get('src') === 'player' ? 'player' : 'club';
+    sourceTypeEl.value = currentSourceType;
+    updateHint();
     currentSource = params.get('exclude') || '';
     const dbfNr = params.get('p');
     if (dbfNr) {
@@ -598,7 +879,17 @@ sourceEl.addEventListener('change', () => {
   render();
 });
 
+sourceTypeEl.addEventListener('change', async () => {
+  currentSourceType = sourceTypeEl.value === 'player' ? 'player' : 'club';
+  currentSource = '';
+  await refreshSourceCatalog();
+  render();
+});
+
 shareBtnEl.addEventListener('click', copyShareUrl);
+
+sourceTypeEl.value = currentSourceType;
+updateHint();
 
 restoreStateFromUrl().finally(() => {
   fetchAllPlayers().catch(() => {});

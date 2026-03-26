@@ -30,16 +30,34 @@
   font-family: 'IBM Plex Mono', monospace;
 }
 
+#ifonly-source-type,
 #ifonly-source {
   min-width: 220px;
 }
 
 .ifonly-hint {
+  flex: 1 1 320px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.68rem;
   color: var(--muted);
   line-height: 1.5;
   max-width: 440px;
+}
+
+.ifonly-source-status {
+  min-height: 1.2rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ifonly-source-status.err {
+  color: var(--danger);
+}
+
+.ifonly-source-status.ok {
+  color: var(--fresh);
 }
 
 .ifonly-empty {

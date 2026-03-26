@@ -12,11 +12,14 @@ const DEFAULT_ROUTE = process.env.OPEN_ROUTE || '/';
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
+const TURN_BASE_URL = 'https://medlemmer.bridge.dk/LookUpTURN.php';
 const HACALLE_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const TURN_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 let hacalleCache = null;
 const lookupCache = new Map(); // dbfNr -> { ts, data }
+const turnCache = new Map(); // turnId -> { ts, data }
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -213,6 +216,152 @@ function parseLookupHtml(html) {
   return { name, startHc, entries: chronologicalEntries };
 }
 
+function parseTurnHtml(html) {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? stripTags(titleMatch[1]) : '';
+
+  let organizer = '';
+  let playedAt = '';
+  let postedAt = '';
+
+  const allRows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+  for (const rowMatch of allRows) {
+    const cells = extractCells(rowMatch[1]).map(stripTags);
+    if (cells.length < 2) continue;
+    if (!organizer && /^\d{3,5}\s/.test(cells[0])) {
+      organizer = cells[0];
+      continue;
+    }
+    if (/^Spilledato:/i.test(cells[0])) playedAt = cells[1];
+    if (/^Posteringstidspunkt:/i.test(cells[0])) postedAt = cells[1];
+  }
+
+  const parsedRows = allRows.map(rowMatch => ({
+    raw: rowMatch[0],
+    cells: extractCells(rowMatch[1]).map(stripTags),
+  }));
+
+  const pairHeaderIndex = parsedRows.findIndex(row => {
+    const headerKey = row.cells.join('|').toLowerCase();
+    return /parnummer\|navn\|starthandicap\|score\|handicapscore/.test(headerKey);
+  });
+
+  if (pairHeaderIndex >= 0) {
+    const groups = [];
+    let currentGroup = null;
+    for (const row of parsedRows.slice(pairHeaderIndex + 1)) {
+      if (!/MasterPoint(?:Equal|Odd)Row/i.test(row.raw)) continue;
+      const cells = row.cells;
+      if (cells.length < 5) continue;
+
+      const pairNo = cells[0];
+      const name = cells[1];
+      if (!name) continue;
+
+      if (pairNo) {
+        currentGroup = {
+          groupKey: pairNo,
+          players: [],
+          score: parseDanishNumber(cells[3]),
+          handicapScore: parseDanishNumber(cells[4]),
+        };
+        groups.push(currentGroup);
+      } else if (!currentGroup) {
+        currentGroup = {
+          groupKey: `row-${groups.length + 1}`,
+          players: [],
+          score: parseDanishNumber(cells[3]),
+          handicapScore: parseDanishNumber(cells[4]),
+        };
+        groups.push(currentGroup);
+      }
+
+      currentGroup.players.push({
+        name,
+        startHandicap: parseDanishNumber(cells[2]),
+        score: parseDanishNumber(cells[3]),
+        handicapScore: parseDanishNumber(cells[4]),
+      });
+    }
+
+    return {
+      title,
+      organizer,
+      playedAt,
+      postedAt,
+      formatHint: 'pair',
+      relationshipConfidence: groups.length ? 'high' : 'none',
+      groups,
+    };
+  }
+
+  const teamHeaderIndex = parsedRows.findIndex(row => {
+    const headerKey = row.cells.join('|').toLowerCase();
+    return /holdnummer\|retning\|modstander holdnummer\|navn\|starthandicap\|butler imps\|handicapscore/.test(headerKey);
+  });
+
+  if (teamHeaderIndex >= 0) {
+    const groups = [];
+    let currentGroup = null;
+
+    for (const row of parsedRows.slice(teamHeaderIndex + 1)) {
+      if (!/MasterPoint(?:Equal|Odd)Row/i.test(row.raw)) continue;
+      const cells = row.cells;
+      if (cells.length < 7) continue;
+
+      const holdNumber = cells[0];
+      const direction = cells[1];
+      const opponentHoldNumber = cells[2];
+      const name = cells[3];
+      if (!name) continue;
+
+      if (holdNumber) {
+        currentGroup = {
+          groupKey: holdNumber,
+          opponentGroupKey: opponentHoldNumber || null,
+          players: [],
+        };
+        groups.push(currentGroup);
+      } else if (!currentGroup) {
+        currentGroup = {
+          groupKey: `hold-${groups.length + 1}`,
+          opponentGroupKey: opponentHoldNumber || null,
+          players: [],
+        };
+        groups.push(currentGroup);
+      }
+
+      currentGroup.players.push({
+        name,
+        direction,
+        startHandicap: parseDanishNumber(cells[4]),
+        score: parseDanishNumber(cells[5]),
+        handicapScore: parseDanishNumber(cells[6]),
+      });
+    }
+
+    return {
+      title,
+      organizer,
+      playedAt,
+      postedAt,
+      formatHint: 'team-known-seating',
+      relationshipConfidence: groups.length ? 'high' : 'none',
+      groups,
+    };
+  }
+
+  return {
+    title,
+    organizer,
+    playedAt,
+    postedAt,
+    formatHint: 'unknown',
+    relationshipConfidence: 'none',
+    groups: [],
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
 
@@ -283,6 +432,42 @@ const server = http.createServer(async (req, res) => {
       const data = parseLookupHtml(decodeWindows1252(buffer));
       lookupCache.set(dbfNr, { ts: now, data });
       sendJson(res, 200, { ...data, dbfNr, cachedAt: now, cache: 'MISS' });
+    } catch (err) {
+      sendJson(res, 502, { error: 'Relay request failed', message: err.message });
+    }
+    return;
+  }
+
+  if (reqUrl.pathname === '/api/turn') {
+    const turnId = (reqUrl.searchParams.get('turnId') || '').replace(/\D/g, '');
+    if (!turnId) {
+      sendJson(res, 400, { error: 'Missing turnId query param' });
+      return;
+    }
+
+    const now = Date.now();
+    const forceRefresh = reqUrl.searchParams.get('refresh') === '1';
+    const cached = turnCache.get(turnId);
+    if (!forceRefresh && cached && now - cached.ts <= TURN_CACHE_MAX_AGE_MS) {
+      sendJson(res, 200, { ...cached.data, turnId, cachedAt: cached.ts, cache: 'HIT' });
+      return;
+    }
+
+    try {
+      const upstream = await fetch(`${TURN_BASE_URL}?TurnID=${encodeURIComponent(turnId)}`, {
+        method: 'GET',
+        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+      });
+
+      if (!upstream.ok) {
+        sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
+        return;
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const data = parseTurnHtml(decodeWindows1252(buffer));
+      turnCache.set(turnId, { ts: now, data });
+      sendJson(res, 200, { ...data, turnId, cachedAt: now, cache: 'MISS' });
     } catch (err) {
       sendJson(res, 502, { error: 'Relay request failed', message: err.message });
     }
