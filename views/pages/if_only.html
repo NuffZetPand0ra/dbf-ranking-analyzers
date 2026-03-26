@@ -1,0 +1,87 @@
+---
+layout: base.hbs
+title: Hvis Bare-analyse
+ogTitle: Hvis Bare-analyse
+description: Sammenlign din faktiske HC-udvikling med en alternativ delta-bane uden en valgt klub.
+appleTitle: Hvis Bare
+headScripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js
+stylesheets:
+  - /css/analyzer-theme.css
+  - /css/dbf_if_only.css
+bodyScripts:
+  - /js/utils.js
+  - /js/dbf_if_only.js
+  - /js/theme.js
+permalink: /tools/if-only/index.html
+---
+<main class="page">
+<header>
+  {{> analyzer_header headerRowClass="page-header" title="Hvis Bare-analyse" titleClass="page-title" subtitle="En alternativ HC-bane baseret på relative deltas, ikke et facit for hvad der ville være sket." subtitleClass="page-subtitle"}}
+</header>
+
+<div class="ifonly-controls">
+  <div class="ifonly-control-row">
+    <div class="ifonly-search-group">
+      <span class="lbl">Spiller</span>
+      <div class="autocomplete-wrapper">
+        <input type="text" id="ifonly-search" placeholder="Søg efter spiller..." autocomplete="off" aria-label="Søg spiller">
+        <div class="autocomplete-dropdown" id="ifonly-dropdown" style="display:none"></div>
+      </div>
+    </div>
+    <span class="fetch-status" id="ifonly-status"></span>
+  </div>
+
+  <div class="ifonly-control-row">
+    <div>
+      <span class="lbl">Ekskluder kilde</span>
+      <select id="ifonly-source" disabled>
+        <option value="">Ingen eksklusion</option>
+      </select>
+    </div>
+    <span class="ifonly-hint">Version 1: kilden er en klub/arrangør fra den rå DBf-historik.</span>
+    <span class="add-btn" id="ifonly-share-btn">Del link</span>
+  </div>
+</div>
+
+<div class="ifonly-empty" id="ifonly-empty">Søg efter en spiller for at sammenligne den faktiske HC-kurve med en alternativ “hvis bare”-bane.</div>
+
+<div class="ifonly-wrap" id="ifonly-wrap" style="display:none">
+  <section class="ifonly-overview card">
+    <div class="ifonly-overview-main">
+      <div>
+        <h2 class="ifonly-player" id="ifonly-player"></h2>
+        <p class="ifonly-player-meta" id="ifonly-player-meta"></p>
+      </div>
+      <div class="ifonly-overview-side">
+        <p class="ifonly-overview-label">Aktiv analyse</p>
+        <p class="ifonly-overview-value" id="ifonly-source-name"></p>
+        <p class="ifonly-overview-sub" id="ifonly-source-detail"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="ifonly-chart-card card">
+    <div class="ifonly-chart-head">
+      <div class="ifonly-legend">
+        <span class="ifonly-legend-item">
+          <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#378ADD" stroke-width="2.4"/></svg>
+          Faktisk HC
+        </span>
+        <span class="ifonly-legend-item">
+          <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#D85A30" stroke-width="2.4" stroke-dasharray="6 4"/></svg>
+          Hvis bare
+        </span>
+      </div>
+    </div>
+    <div class="ifonly-chart-wrap">
+      <canvas id="ifonly-chart"></canvas>
+    </div>
+  </section>
+
+  <div class="ifonly-stats" id="ifonly-stats"></div>
+  <p class="ifonly-note" id="ifonly-note"></p>
+</div>
+
+{{> footer wrapperClass="page-footer"}}
+</main>

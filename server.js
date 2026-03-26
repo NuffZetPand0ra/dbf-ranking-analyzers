@@ -122,6 +122,11 @@ function stripTags(html) {
     .trim();
 }
 
+function parseDanishNumber(text) {
+  const value = parseFloat(String(text).replace(/\u00a0/g, '').replace(/\s+/g, '').replace(',', '.'));
+  return Number.isFinite(value) ? value : null;
+}
+
 function parseHacalleHtml(html) {
   const players = [];
   const rowRe = /<tr[^>]+class="[^"]*MasterPoint(?:Equal|Odd)Row[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -154,21 +159,58 @@ function parseLookupHtml(html) {
     if (h3Match) name = h3Match[1].trim();
   }
 
+  let startHc = null;
+  const startHcMatch = html.match(/Start handicap<\/TD><TD[^>]*>([^<]+)<\/TD>/i);
+  if (startHcMatch) {
+    startHc = parseDanishNumber(stripTags(startHcMatch[1]));
+  }
+
   const entries = [];
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let rowMatch;
   while ((rowMatch = rowRe.exec(html)) !== null) {
     const cells = extractCells(rowMatch[1]);
+    if (/Start handicap/i.test(rowMatch[1])) {
+      if (cells.length >= 2) startHc = parseDanishNumber(stripTags(cells[1]));
+      continue;
+    }
     if (cells.length < 5) continue;
+
     const dateText = stripTags(cells[0]);
     const dm = dateText.match(/^(\d{2})-(\d{2})-(\d{4})$/);
     if (!dm) continue;
-    const hc = parseFloat(stripTags(cells[4]).replace(/\u00a0/g, '').replace(',', '.'));
-    if (isNaN(hc)) continue;
-    entries.push({ date: `${dm[3]}-${dm[2]}-${dm[1]}`, hc });
+
+    const tournament = stripTags(cells[1]);
+    const turnIdMatch = cells[1].match(/TurnID=(\d+)/i);
+    const club = stripTags(cells[2]);
+    const change = parseDanishNumber(stripTags(cells[3]));
+    const hc = parseDanishNumber(stripTags(cells[4]));
+    if (hc === null) continue;
+
+    const statusText = stripTags(cells[5] || '');
+    const isApplied = /2713|✓/.test(cells[5] || '') || /ok|godkendt|aktiv/i.test(statusText);
+
+    entries.push({
+      date: `${dm[3]}-${dm[2]}-${dm[1]}`,
+      tournament,
+      club,
+      change,
+      hc,
+      turnId: turnIdMatch ? turnIdMatch[1] : null,
+      status: statusText,
+      applied: isApplied,
+      sourceType: 'club',
+      sourceLabel: club,
+    });
   }
-  entries.sort((a, b) => a.date.localeCompare(b.date));
-  return { name, entries };
+
+  const chronologicalEntries = entries.reverse().map((entry, index) => ({
+    ...entry,
+    seq: index,
+    id: entry.turnId ? `turn-${entry.turnId}` : `entry-${index}`,
+  }));
+
+  return { name, startHc, entries: chronologicalEntries };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -256,4 +298,5 @@ server.listen(PORT, HOST, () => {
   console.log('Open:', `${base}${DEFAULT_ROUTE}`);
   console.log('Handicap comparison:', `${base}/tools/handicap-comparison/`);
   console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
+  console.log('If-Only analyzer:', `${base}/tools/if-only/`);
 });
