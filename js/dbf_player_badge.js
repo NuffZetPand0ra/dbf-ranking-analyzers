@@ -396,17 +396,9 @@ function render() {
   const natPct  = allPlayersData ? nationalPercentile(currentHc, allPlayersData) : null;
   const clubPct = allPlayersData ? clubPercentile(currentHc, currentPlayer.club, allPlayersData) : null;
 
-  // HC at anchor: last entry on or before the anchor date
-  let anchorHc;
-  const beforeAnchor = currentPlayer.entries.filter(e => e.date <= anchorDate);
-  anchorHc = beforeAnchor.length
-    ? beforeAnchor[beforeAnchor.length - 1].hc
-    : (hasData ? filteredEntries[0].hc : currentHc);
-
   // Regression for prediction slope.
-  // Use the explicit regression window (regMonths back from the anchor date),
-  // independent of the view from/to. Centre x-values to prevent catastrophic
-  // float cancellation with large epoch-day numbers.
+  // Uses the explicit regression window (regMonths) ending at the anchor date.
+  // Centre x-values to prevent catastrophic float cancellation.
   const regMonths = Math.max(1, parseInt(regMonthsEl.value, 10) || 12);
   const regWindowMs = regMonths * 30.4375 * 24 * 60 * 60 * 1000;
   const regWindowStart = new Date(anchorDate.getTime() - regWindowMs);
@@ -420,30 +412,37 @@ function render() {
     rawSlope = linearRegression(pts).slope;
   }
 
-  const predEntries = generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths);
+  // ── Build chart datasets ──────────────────────────────────────────────────
+  // The prediction line always starts from the last actual data point so it
+  // connects cleanly to the solid line regardless of where the anchor date is.
+  // The anchor date only governs the regression window (slope calculation).
+  const predStartDate = hasData
+    ? filteredEntries[filteredEntries.length - 1].date
+    : anchorDate;
+  const predStartHc = hasData
+    ? filteredEntries[filteredEntries.length - 1].hc
+    : currentHc;
 
-  // ── Build chart labels — unified sorted category timeline ─────────────────
-  // Category scale gives each data point equal visual width, which looks much
-  // better than a linear time scale when dense actual entries (weekly) sit
-  // alongside sparse prediction points (monthly).
-  //
-  // The prediction always starts at anchorDate. Include it as the first pred
-  // point so the dashed line begins exactly at ps, even when ps is mid-range.
-  const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
+  const predEntries = generatePrediction(predStartDate, predStartHc, rawSlope, opt, predMonths);
+  // Include the start point so the dashed line connects to the solid line end
+  const predWithStart = [{ date: predStartDate, hc: predStartHc }, ...predEntries];
 
-  // Merge actual + prediction timestamps into one sorted unique set
-  const actualTimes = filteredEntries.map(e => e.date.getTime());
-  const predTimes   = predWithAnchor.map(e => e.date.getTime());
-  const allTimes    = [...new Set([...actualTimes, ...predTimes])].sort((a, b) => a - b);
-  const allLabels   = allTimes.map(t => fmtDate(new Date(t)));
+  // Actual entries are plotted as-is; prediction entries come after.
+  // No merging needed — prediction starts exactly where actual data ends,
+  // so there is no interleaving and no need for spanGaps tricks.
+  const actualLabels = filteredEntries.map(e => fmtDate(e.date));
+  const predLabels   = predEntries.map(e => fmtDate(e.date));
+  const allLabels    = [...actualLabels, ...predLabels];
 
-  const actualMap = new Map(filteredEntries.map(e => [e.date.getTime(), e.hc]));
-  const predMap   = new Map(predWithAnchor.map(e => [e.date.getTime(), e.hc]));
-
-  const actualDataFull = allTimes.map(t => actualMap.has(t) ? actualMap.get(t) : null);
-  // spanGaps:true on pred so the dashed line is continuous even when prediction
-  // monthly dates are interleaved with actual-only dates (nulls in pred array)
-  const predDataFull   = allTimes.map(t => predMap.has(t)   ? predMap.get(t)   : null);
+  const actualDataFull = [
+    ...filteredEntries.map(e => e.hc),
+    ...Array(predLabels.length).fill(null)
+  ];
+  const predDataFull = [
+    ...Array(Math.max(0, actualLabels.length - 1)).fill(null),
+    predStartHc,           // overlap the last actual point for a seamless join
+    ...predEntries.map(e => e.hc)
+  ];
 
   const actualDataset = {
     label: 'Faktisk HC',
@@ -469,7 +468,7 @@ function render() {
     pointHoverRadius: 4,
     tension: 0,
     fill: false,
-    spanGaps: true
+    spanGaps: false
   };
 
   // ── Update or create chart ───────────────────────────────────────────────
