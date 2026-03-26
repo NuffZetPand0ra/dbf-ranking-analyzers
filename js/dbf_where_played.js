@@ -484,14 +484,16 @@ function fillPartnerTree(tableId, partners, eventsMap) {
   th3.textContent = 'Turnering';
   const th4 = document.createElement('th');
   th4.textContent = 'Antal';
-  thead.append(th1, th2, th3, th4);
+  const th5 = document.createElement('th');
+  th5.textContent = 'HC';
+  thead.append(th1, th2, th3, th4, th5);
 
   const tbody = table.querySelector('tbody');
   tbody.innerHTML = '';
   if (!partners.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 4;
+    td.colSpan = 5;
     td.className = 'wp-table-empty';
     td.textContent = 'Ingen data';
     tr.appendChild(td);
@@ -516,7 +518,13 @@ function fillPartnerTree(tableId, partners, eventsMap) {
     const tdTournParent = document.createElement('td');
     const tdCount = document.createElement('td');
     tdCount.textContent = String(partner.count);
-    tr.append(tdName, tdClubParent, tdTournParent, tdCount);
+    const tdHcSum = document.createElement('td');
+    tdHcSum.className = 'wp-tree-hc-cell';
+    const hcSum = events.reduce((sum, e) => sum + (typeof e.change === 'number' ? e.change : 0), 0);
+    const sign = hcSum >= 0 ? '+' : '';
+    tdHcSum.textContent = sign + hcSum.toFixed(2);
+    if (hcSum !== 0) tdHcSum.classList.add(hcSum < 0 ? 'wp-hc-down' : 'wp-hc-up');
+    tr.append(tdName, tdClubParent, tdTournParent, tdCount, tdHcSum);
     tbody.appendChild(tr);
 
     // Child rows (hidden by default)
