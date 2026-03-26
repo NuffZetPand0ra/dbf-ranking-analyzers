@@ -488,6 +488,10 @@ function render() {
   // Prediction starts at the anchor date; both lines are fully independent
   const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
 
+  // Resolve CSS variables for Chart.js (canvas can't use var(--x) strings)
+  const rootStyle  = getComputedStyle(document.documentElement);
+  const mutedColor = rootStyle.getPropertyValue('--muted').trim() || '#888';
+
   // ── Build chart datasets as {x: timestamp_ms, y: hc} ─────────────────────
   // Two independent solid lines on a linear time axis — no merging, no
   // interleaving. The linear scale spaces points proportionally to real time
@@ -554,15 +558,15 @@ function render() {
             autoSkip: true,
             maxTicksLimit: 12,
             font: { size: 10 },
-            color: 'var(--muted)',
+            color: mutedColor,
             callback: val => fmtDate(new Date(val))
           },
           grid: { color: 'rgba(128,128,128,0.08)' }
         },
         y: {
           reverse: true,
-          title:  { display: true, text: 'Handicap', font: { size: 11 }, color: 'var(--muted)' },
-          ticks:  { font: { size: 10 }, color: 'var(--muted)' },
+          title:  { display: true, text: 'Handicap', font: { size: 11 }, color: mutedColor },
+          ticks:  { font: { size: 10 }, color: mutedColor },
           grid:   { color: 'rgba(128,128,128,0.08)' }
         }
       }
@@ -587,8 +591,8 @@ function render() {
     makeStatCard('Min HC',  minHc.toFixed(2), 'i perioden'),
     makeStatCard('Max HC',  maxHc.toFixed(2), 'i perioden'),
     makeStatCard('Stabilitet',   stability.score + '/100', stability.label,  scoreColor(stability.score)),
-    makeStatCard('Pr. spil',     stability.scoreA + '/100',
-      'ø ' + stability.avgEntryDelta.toFixed(3) + ' Δhc pr. spil',          scoreColor(stability.scoreA)),
+    makeStatCard('Pr. sektion',  stability.scoreA + '/100',
+      'ø ' + stability.avgEntryDelta.toFixed(3) + ' Δhc pr. sektion',       scoreColor(stability.scoreA)),
     makeStatCard('Pr. måned',    stability.scoreB + '/100',
       'ø ' + stability.avgMonthDelta.toFixed(2)  + ' Δhc pr. måned',        scoreColor(stability.scoreB))
   );
@@ -615,6 +619,31 @@ function render() {
   wrapEl.style.display  = '';
 
   syncUrl();
+
+  // ── Datestamp ────────────────────────────────────────────────────────────
+  document.getElementById('badge-datestamp').textContent = fmtDate(new Date());
+
+  // ── QR code ───────────────────────────────────────────────────────────────
+  // Build a clean URL from state params (avoids any stale/debug query strings)
+  const cleanQs  = buildStateParams().toString();
+  const shareUrl = window.location.origin + window.location.pathname + (cleanQs ? '?' + cleanQs : '');
+
+  const qrEl = document.getElementById('badge-qr');
+  qrEl.innerHTML = '';
+  if (window.QRCodeStyling) {
+    const qr = new QRCodeStyling({
+      width: 80,
+      height: 80,
+      type: 'svg',
+      data: shareUrl,
+      qrOptions:            { errorCorrectionLevel: 'M' },
+      dotsOptions:          { type: 'rounded',       color: BADGE_COLOR },
+      cornersSquareOptions: { type: 'extra-rounded', color: BADGE_COLOR },
+      cornersDotOptions:    { type: 'dot',           color: BADGE_COLOR },
+      backgroundOptions:    { color: '#ffffff' },
+    });
+    qr.append(qrEl);
+  }
 }
 
 // ── URL state ─────────────────────────────────────────────────────────────────

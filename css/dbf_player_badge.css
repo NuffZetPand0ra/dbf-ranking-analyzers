@@ -212,6 +212,46 @@
   margin-top: 1px;
 }
 
+/* ── Badge footer (datestamp + QR) ──────────────────────── */
+.badge-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem 0.7rem;
+  border-top: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.badge-datestamp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-datestamp-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.badge-datestamp-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+/* QR code: white bg + blue ink; always scannnable regardless of theme */
+.badge-qr svg,
+.badge-qr canvas,
+.badge-qr img {
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 0 0 5px #fff, 0 0 0 6px rgba(55,138,221,0.25);
+  flex-shrink: 0;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 600px) {
   .badge-chart-wrap { height: 220px; }

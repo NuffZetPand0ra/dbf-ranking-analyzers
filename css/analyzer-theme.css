@@ -121,12 +121,16 @@ select {
 .help-btn,
 .clear-btn,
 #uploadBtnBig {
+  display: inline-block;
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
   letter-spacing: 0.02em;
+  padding: 5px 12px;
+  user-select: none;
+  white-space: nowrap;
   transition: background 0.16s, border-color 0.16s, color 0.16s;
 }
 
