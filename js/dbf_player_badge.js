@@ -19,6 +19,7 @@ const statusEl      = document.getElementById('badge-status');
 const fromEl        = document.getElementById('badge-from');
 const toEl          = document.getElementById('badge-to');
 const predMonthsEl  = document.getElementById('badge-pred-months');
+const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
 const optValEl      = document.getElementById('badge-opt-val');
 const shareBtnEl    = document.getElementById('badge-share-btn');
@@ -423,20 +424,16 @@ function render() {
   }
 
   // Regression for prediction slope.
-  // Use the filtered window, but enforce a minimum of 6 months so that a
-  // tiny blip in a short view window can't produce an absurd slope.
-  // If the filtered window is shorter than 6 months, extend it back in time.
-  // Centre x-values to prevent catastrophic float cancellation.
-  const MIN_REG_MS = 6 * 30 * 24 * 60 * 60 * 1000; // ~6 months
+  // Use the explicit regression window (regMonths back from the anchor date),
+  // independent of the view from/to. Centre x-values to prevent catastrophic
+  // float cancellation with large epoch-day numbers.
+  const regMonths = Math.max(1, parseInt(regMonthsEl.value, 10) || 12);
+  const regWindowMs = regMonths * 30.4375 * 24 * 60 * 60 * 1000;
+  const regWindowStart = new Date(anchorDate.getTime() - regWindowMs);
+  const regEntries = currentPlayer.entries.filter(
+    e => e.date >= regWindowStart && e.date <= anchorDate
+  );
   let rawSlope = 0;
-  let regEntries = filteredEntries;
-  if (filteredEntries.length >= 2) {
-    const filteredSpan = filteredEntries[filteredEntries.length - 1].date - filteredEntries[0].date;
-    if (filteredSpan < MIN_REG_MS) {
-      const windowStart = new Date(anchorDate.getTime() - MIN_REG_MS);
-      regEntries = currentPlayer.entries.filter(e => e.date >= windowStart && e.date <= anchorDate);
-    }
-  }
   if (regEntries.length >= 2) {
     const x0  = regEntries[0].date / 86400000;
     const pts = regEntries.map(e => ({ x: e.date / 86400000 - x0, y: e.hc }));
@@ -596,6 +593,8 @@ function buildStateParams() {
   if (toEl.value)   p.set('to', toEl.value);
   const pm = parseInt(predMonthsEl.value, 10);
   if (pm && pm !== 12) p.set('pm', String(pm));
+  const rw = parseInt(regMonthsEl.value, 10);
+  if (rw && rw !== 12) p.set('rw', String(rw));
   const opt = parseFloat(optimismEl.value);
   if (opt !== 0) p.set('opt', String(opt));
 
@@ -624,6 +623,8 @@ async function restoreStateFromUrl() {
     if (params.get('to'))    toEl.value   = params.get('to');
     const pm = params.get('pm');
     if (pm) predMonthsEl.value = pm;
+    const rw = params.get('rw');
+    if (rw) regMonthsEl.value = rw;
     const opt = params.get('opt');
     if (opt) {
       optimismEl.value = opt;
@@ -715,6 +716,7 @@ fromEl.addEventListener('change', () => {
 });
 toEl.addEventListener('change', render);
 predMonthsEl.addEventListener('input', render);
+regMonthsEl.addEventListener('input', render);
 
 optimismEl.addEventListener('input', () => {
   optValEl.textContent = parseFloat(optimismEl.value).toFixed(1);
@@ -725,6 +727,19 @@ shareBtnEl.addEventListener('click', copyShareUrl);
 exportBtnEl.addEventListener('click', exportBadge);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+// Set default dates to last 1 year when no URL state is present
+(function initDefaults() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get('from')) {
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    fromEl.value = toIso(oneYearAgo);
+  }
+  if (!params.get('to')) {
+    toEl.value = toIso(new Date());
+  }
+})();
+
 restoreStateFromUrl().finally(() => {
   // Pre-warm player list in background
   fetchAllPlayers().catch(() => {});
