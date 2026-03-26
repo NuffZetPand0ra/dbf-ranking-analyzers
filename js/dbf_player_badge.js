@@ -4,6 +4,7 @@ const LOOKUP_CACHE_MAX_AGE_MS    = 12 * 60 * 60 * 1000;
 const ALL_PLAYERS_CACHE_KEY      = 'dbf_all_players_cache_v1';
 const ALL_PLAYERS_CACHE_MAX_AGE  = 12 * 60 * 60 * 1000;
 const BADGE_COLOR                = '#378ADD';
+const PRED_COLOR                 = '#f59e0b';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentPlayer    = null;   // { name, dbfNr, club, entries:[{date:Date, hc}] }
@@ -412,41 +413,27 @@ function render() {
     rawSlope = linearRegression(pts).slope;
   }
 
-  // ── Build chart datasets ──────────────────────────────────────────────────
-  // The prediction line always starts from the last actual data point so it
-  // connects cleanly to the solid line regardless of where the anchor date is.
-  // The anchor date only governs the regression window (slope calculation).
-  const predStartDate = hasData
-    ? filteredEntries[filteredEntries.length - 1].date
-    : anchorDate;
-  const predStartHc = hasData
-    ? filteredEntries[filteredEntries.length - 1].hc
-    : currentHc;
+  // HC at anchor: last actual entry on or before the anchor date
+  const beforeAnchor = currentPlayer.entries.filter(e => e.date <= anchorDate);
+  const anchorHc = beforeAnchor.length
+    ? beforeAnchor[beforeAnchor.length - 1].hc
+    : (hasData ? filteredEntries[0].hc : currentHc);
 
-  const predEntries = generatePrediction(predStartDate, predStartHc, rawSlope, opt, predMonths);
-  // Include the start point so the dashed line connects to the solid line end
-  const predWithStart = [{ date: predStartDate, hc: predStartHc }, ...predEntries];
+  const predEntries = generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths);
+  // Prediction starts at the anchor date; both lines are fully independent
+  const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
 
-  // Actual entries are plotted as-is; prediction entries come after.
-  // No merging needed — prediction starts exactly where actual data ends,
-  // so there is no interleaving and no need for spanGaps tricks.
-  const actualLabels = filteredEntries.map(e => fmtDate(e.date));
-  const predLabels   = predEntries.map(e => fmtDate(e.date));
-  const allLabels    = [...actualLabels, ...predLabels];
-
-  const actualDataFull = [
-    ...filteredEntries.map(e => e.hc),
-    ...Array(predLabels.length).fill(null)
-  ];
-  const predDataFull = [
-    ...Array(Math.max(0, actualLabels.length - 1)).fill(null),
-    predStartHc,           // overlap the last actual point for a seamless join
-    ...predEntries.map(e => e.hc)
-  ];
+  // ── Build chart datasets as {x: timestamp_ms, y: hc} ─────────────────────
+  // Two independent solid lines on a linear time axis — no merging, no
+  // interleaving. The linear scale spaces points proportionally to real time
+  // so dense actual data and sparse monthly prediction coexist cleanly.
+  // x-axis bounds are set explicitly so the chart fills its full width.
+  const xMin = hasData ? filteredEntries[0].date.getTime() : anchorDate.getTime();
+  const xMax = predWithAnchor[predWithAnchor.length - 1].date.getTime();
 
   const actualDataset = {
     label: 'Faktisk HC',
-    data: actualDataFull,
+    data: filteredEntries.map(e => ({ x: e.date.getTime(), y: e.hc })),
     borderColor: BADGE_COLOR,
     backgroundColor: BADGE_COLOR + '22',
     borderWidth: 2.5,
@@ -454,64 +441,68 @@ function render() {
     pointHoverRadius: 5,
     tension: 0.1,
     fill: false,
-    spanGaps: false
   };
 
   const predDataset = {
     label: 'Prognose',
-    data: predDataFull,
-    borderColor: BADGE_COLOR + '88',
-    backgroundColor: BADGE_COLOR + '11',
+    data: predWithAnchor.map(e => ({ x: e.date.getTime(), y: e.hc })),
+    borderColor: PRED_COLOR,
+    backgroundColor: PRED_COLOR + '22',
     borderWidth: 2,
-    borderDash: [6, 4],
-    pointRadius: 2,
-    pointHoverRadius: 4,
+    pointRadius: 3,
+    pointHoverRadius: 5,
     tension: 0,
     fill: false,
-    spanGaps: false
   };
 
   // ── Update or create chart ───────────────────────────────────────────────
-  if (chart) {
-    chart.data.labels   = allLabels;
-    chart.data.datasets = [actualDataset, predDataset];
-    chart.update();
-  } else {
-    chart = new Chart(badgeChartEl, {
-      type: 'line',
-      data: { labels: allLabels, datasets: [actualDataset, predDataset] },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                const v = ctx.parsed.y;
-                if (v === null) return null;
-                const tag = ctx.datasetIndex === 1 ? 'Prognose' : 'HC';
-                return ` ${tag}: ${v.toFixed(2)}`;
-              }
+  // Always destroy + recreate so scale options (min/max) stay fresh
+  if (chart) { chart.destroy(); chart = null; }
+  chart = new Chart(badgeChartEl, {
+    type: 'line',
+    data: { datasets: [actualDataset, predDataset] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => fmtDate(new Date(items[0].parsed.x)),
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (v == null) return null;
+              const tag = ctx.datasetIndex === 1 ? 'Prognose' : 'HC';
+              return ` ${tag}: ${v.toFixed(2)}`;
             }
           }
-        },
-        scales: {
-          x: {
-            ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 14, font: { size: 10 }, color: 'var(--muted)' },
-            grid:  { color: 'rgba(128,128,128,0.08)' }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: xMin,
+          max: xMax,
+          ticks: {
+            maxRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 12,
+            font: { size: 10 },
+            color: 'var(--muted)',
+            callback: val => fmtDate(new Date(val))
           },
-          y: {
-            reverse: true,
-            title:  { display: true, text: 'Handicap', font: { size: 11 }, color: 'var(--muted)' },
-            ticks:  { font: { size: 10 }, color: 'var(--muted)' },
-            grid:   { color: 'rgba(128,128,128,0.08)' }
-          }
+          grid: { color: 'rgba(128,128,128,0.08)' }
+        },
+        y: {
+          reverse: true,
+          title:  { display: true, text: 'Handicap', font: { size: 11 }, color: 'var(--muted)' },
+          ticks:  { font: { size: 10 }, color: 'var(--muted)' },
+          grid:   { color: 'rgba(128,128,128,0.08)' }
         }
       }
-    });
-  }
+    }
+  });
 
   // ── Badge header ─────────────────────────────────────────────────────────
   document.getElementById('badge-name').textContent = currentPlayer.name;
