@@ -12,6 +12,7 @@ let allPlayersData   = null;   // players[] from /api/hacalle
 let chart            = null;
 let autocompleteIndex = -1;
 let isRestoringState = false;
+let showHover       = true;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const searchEl      = document.getElementById('badge-search');
@@ -23,6 +24,7 @@ const predMonthsEl  = document.getElementById('badge-pred-months');
 const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
 const optValEl      = document.getElementById('badge-opt-val');
+const hoverBtnEl    = document.getElementById('badge-toggle-hover');
 const shareBtnEl    = document.getElementById('badge-share-btn');
 const exportBtnEl   = document.getElementById('badge-export-btn');
 const emptyEl       = document.getElementById('badge-empty');
@@ -403,6 +405,17 @@ function clubPercentile(hc, club, allPlayers) {
   return Math.round((worse / clubPlayers.length) * 100);
 }
 
+function applyHoverState() {
+  if (hoverBtnEl) hoverBtnEl.classList.toggle('on', showHover);
+  if (!chart) return;
+
+  chart.options.plugins.tooltip.enabled = showHover;
+  chart.data.datasets.forEach(dataset => {
+    dataset.pointHoverRadius = showHover ? 5 : 0;
+  });
+  chart.update('none');
+}
+
 // ── Date formatting ───────────────────────────────────────────────────────────
 function fmtDate(d) {
   return d.toLocaleDateString('da-DK', { day: '2-digit', month: 'short', year: '2-digit' });
@@ -528,7 +541,7 @@ function render() {
     backgroundColor: BADGE_COLOR + '22',
     borderWidth: 2.5,
     pointRadius: filteredEntries.length > 60 ? 0 : 3,
-    pointHoverRadius: 5,
+    pointHoverRadius: showHover ? 5 : 0,
     tension: 0.1,
     fill: false,
   };
@@ -540,7 +553,7 @@ function render() {
     backgroundColor: PRED_COLOR + '22',
     borderWidth: 2,
     pointRadius: 3,
-    pointHoverRadius: 5,
+    pointHoverRadius: showHover ? 5 : 0,
     tension: 0,
     fill: false,
   };
@@ -558,6 +571,7 @@ function render() {
       plugins: {
         legend: { display: false },
         tooltip: {
+          enabled: showHover,
           callbacks: {
             title: items => fmtDate(new Date(items[0].parsed.x)),
             label: ctx => {
@@ -679,6 +693,7 @@ function buildStateParams() {
   if (rw && rw !== 12) p.set('rw', String(rw));
   const opt = parseFloat(optimismEl.value);
   if (opt !== 0) p.set('opt', String(opt));
+  if (!showHover) p.set('hover', '0');
 
   return p;
 }
@@ -707,6 +722,8 @@ async function restoreStateFromUrl() {
       optimismEl.value = opt;
       optValEl.textContent = parseFloat(opt).toFixed(1);
     }
+    showHover = params.get('hover') !== '0';
+    if (hoverBtnEl) hoverBtnEl.classList.toggle('on', showHover);
 
     const dbfNr = params.get('p');
     if (dbfNr) {
@@ -793,6 +810,14 @@ optimismEl.addEventListener('input', () => {
   optValEl.textContent = parseFloat(optimismEl.value).toFixed(1);
   render();
 });
+
+if (hoverBtnEl) {
+  hoverBtnEl.addEventListener('click', () => {
+    showHover = !showHover;
+    applyHoverState();
+    syncUrl();
+  });
+}
 
 shareBtnEl.addEventListener('click', copyShareUrl);
 exportBtnEl.addEventListener('click', exportBadge);

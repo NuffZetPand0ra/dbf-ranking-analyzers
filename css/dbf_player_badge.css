@@ -205,6 +205,14 @@
   font-weight: 700;
   color: var(--accent);
 }
+
+.badge-toggle-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  color: var(--muted);
+  user-select: none;
+  white-space: nowrap;
+}
 .badge-pct-sub {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.62rem;
