@@ -656,10 +656,26 @@ async function exportBadge() {
   if (!card || !window.html2canvas) return;
   exportBtnEl.textContent = '⏳ Genererer...';
   try {
+    // html2canvas doesn't support color-mix(). Read computed backgrounds from
+    // the live DOM (browser resolves color-mix() natively) by element index,
+    // then inline them on the matching cloned elements before html2canvas renders.
+    const liveEls = [...card.querySelectorAll('*')];
+    const liveBgs = liveEls.map(el => {
+      const cs = getComputedStyle(el);
+      return { backgroundImage: cs.backgroundImage, backgroundColor: cs.backgroundColor };
+    });
+
     const canvas = await html2canvas(card, {
       backgroundColor: null,
       scale: 2,
-      useCORS: true
+      useCORS: true,
+      onclone: (_doc, clonedCard) => {
+        [...clonedCard.querySelectorAll('*')].forEach((el, i) => {
+          if (!liveBgs[i]) return;
+          el.style.backgroundImage = liveBgs[i].backgroundImage;
+          el.style.backgroundColor = liveBgs[i].backgroundColor;
+        });
+      }
     });
     const link = document.createElement('a');
     const name = (currentPlayer ? currentPlayer.name.replace(/\s+/g, '-') : 'spiller');
