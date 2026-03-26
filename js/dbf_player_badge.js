@@ -299,19 +299,63 @@ function generatePrediction(anchorDate, anchorHc, rawSlope, opt, months) {
 }
 
 // ── Stability score ───────────────────────────────────────────────────────────
+// Two equally-weighted components, each scored on the same anchoring principle:
+//   < 0.03 per entry  → as stable as it gets → 100
+//   > 1.2  per entry  → totally crazy        →   0
+//
+// Component A — per-entry average |Δhc|
+//   Normalised on [0.03 … 1.2]
+//
+// Component B — month-over-month average |Δhc|
+//   Last entry of each calendar month, same normalisation scaled ×4
+//   (a month typically contains ~4 sessions, so the thresholds become
+//    [0.12 … 4.8]; realistically capped at 2.5 to avoid extreme compression)
+//
 function stabilityScore(entries) {
   if (entries.length < 2) return { score: 100, label: 'Høj' };
-  const deltas = [];
-  for (let i = 1; i < entries.length; i++) deltas.push(entries[i].hc - entries[i - 1].hc);
-  const mean = deltas.reduce((a, c) => a + c, 0) / deltas.length;
-  const variance = deltas.reduce((a, c) => a + (c - mean) ** 2, 0) / deltas.length;
-  const stddev = Math.sqrt(variance);
-  const score = Math.round(Math.max(0, 100 - stddev * 20));
-  let label;
-  if (score > 75)      label = 'Høj';
-  else if (score > 50) label = 'God';
-  else if (score > 25) label = 'Moderat';
-  else                 label = 'Lav';
+
+  // ── A: per-entry deltas ──────────────────────────────────────────────
+  let sumAbsDelta = 0;
+  for (let i = 1; i < entries.length; i++) {
+    sumAbsDelta += Math.abs(entries[i].hc - entries[i - 1].hc);
+  }
+  const avgEntryDelta = sumAbsDelta / (entries.length - 1);
+  const scoreA = 100 * Math.max(0, Math.min(1,
+    1 - (avgEntryDelta - 0.03) / (1.2 - 0.03)
+  ));
+
+  // ── B: month-over-month deltas ───────────────────────────────────────
+  // Last HC value recorded in each calendar month
+  const byMonth = new Map();
+  for (const e of entries) {
+    const key = e.date.getFullYear() * 100 + e.date.getMonth();
+    byMonth.set(key, e.hc);   // last entry of the month wins
+  }
+  const monthHcs = [...byMonth.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, hc]) => hc);
+
+  let scoreB = 100;
+  if (monthHcs.length >= 2) {
+    let sumMonthDelta = 0;
+    for (let i = 1; i < monthHcs.length; i++) {
+      sumMonthDelta += Math.abs(monthHcs[i] - monthHcs[i - 1]);
+    }
+    const avgMonthDelta = sumMonthDelta / (monthHcs.length - 1);
+    // Scale: 0.12 → 100 (≈ 4 × 0.03),  2.5 → 0  (cap before extremes)
+    scoreB = 100 * Math.max(0, Math.min(1,
+      1 - (avgMonthDelta - 0.12) / (2.5 - 0.12)
+    ));
+  }
+
+  // ── Combined (50 / 50) ───────────────────────────────────────────────
+  const score = Math.round((scoreA + scoreB) / 2);
+
+  const label = score > 75 ? 'Høj'
+    : score > 50            ? 'God'
+    : score > 25            ? 'Moderat'
+    :                         'Lav';
+
   return { score, label };
 }
 
