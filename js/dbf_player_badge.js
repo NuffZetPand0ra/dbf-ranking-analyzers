@@ -369,6 +369,19 @@ function render() {
     return;
   }
 
+  // Clamp: `from` must not be later than `anchor − regression window`,
+  // otherwise the chart would start after (or inside) the regression period.
+  {
+    const anchor   = getTo() || new Date();
+    const rw       = Math.max(1, parseInt(regMonthsEl.value, 10) || 12);
+    const rwMs     = rw * 30.4375 * 24 * 60 * 60 * 1000;
+    const earliest = new Date(anchor.getTime() - rwMs);
+    const curFrom  = getFrom();
+    if (curFrom && curFrom > earliest) {
+      fromEl.value = toIso(earliest);
+    }
+  }
+
   const from       = getFrom();
   const predMonths = Math.max(0, parseInt(predMonthsEl.value, 10) || 12);
   const opt        = parseFloat(optimismEl.value) || 0;
