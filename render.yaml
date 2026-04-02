@@ -2,7 +2,11 @@ services:
   - type: web
     name: dbf-ranking-analyzers
     runtime: node
-    plan: free
+    plan: starter
+    disk:
+      name: cache-disk
+      mountPath: /var/data
+      sizeGB: 1
     buildCommand: npm install && npm run build
     startCommand: node server.js
     envVars:
@@ -10,3 +14,13 @@ services:
         value: 0.0.0.0
       - key: OPEN_ROUTE
         value: /
+      - key: CACHE_DB_PATH
+        value: /var/data/tournament-cache.sqlite
+      - key: TURN_MUTABLE_TTL_HOURS
+        value: 12
+      - key: TOURNAMENT_IMMUTABLE_DAYS
+        value: 60
+      - key: TURN_CACHE_PARSER_VERSION
+        value: turn-v1
+      - key: TURN_CACHE_PURGE_OLD_VERSIONS_ON_START
+        value: "0"

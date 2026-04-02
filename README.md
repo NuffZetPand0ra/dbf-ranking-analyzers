@@ -117,6 +117,7 @@ The frontend uses local relay endpoints exposed by the Node server:
 - `GET /api/lookup?dbfNr=78976` — individual player HC history
 - `GET /api/turn?turnId=12345` — single tournament details
 - `POST /api/turns` — batch tournament details (JSON body: `{ "ids": [...] }`)
+- `GET /api/cache-status` — in-memory + SQLite tournament cache health and row stats
 
 These endpoints proxy DBf sources so the tools can fetch data from the browser without cross-origin issues.
 
@@ -132,3 +133,25 @@ Deploy flow:
 4. Deploy
 
 Render runs `npm install && npm run build` and then starts `server.js` to serve the generated site and relay API.
+
+## Tournament Cache Persistence
+
+Tournament relay responses are cached in two layers:
+
+- In-memory cache for fast hot reads.
+- SQLite cache for persistence across server restarts.
+
+By default:
+
+- Tournaments older than 60 days are treated as stable and cached without expiration.
+- Newer tournaments use a rolling TTL (`12` hours by default).
+
+Environment variables:
+
+- `CACHE_DB_PATH`: SQLite file path (default: `.cache/tournament-cache.sqlite`)
+- `TURN_MUTABLE_TTL_HOURS`: TTL for mutable tournament cache entries (default: `12`)
+- `TOURNAMENT_IMMUTABLE_DAYS`: age threshold for immutable tournament cache entries (default: `60`)
+- `TURN_CACHE_PARSER_VERSION`: parser schema/version key for tournament cache rows (default: `turn-v1`)
+- `TURN_CACHE_PURGE_OLD_VERSIONS_ON_START`: set to `1` to delete rows from older parser versions on startup
+
+On Render, keep the cache DB on a persistent disk mount (for example `/var/data/tournament-cache.sqlite`).
