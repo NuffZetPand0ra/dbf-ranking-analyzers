@@ -29,7 +29,7 @@ describe('API server', () => {
 
   it('returns MISS then HIT for /api/turn', async () => {
     const server = createTestServer();
-    const turnFixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const turnFixture = readFixtureBuffer('turn_pair.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/LookUpTURN.php')
@@ -49,7 +49,7 @@ describe('API server', () => {
 
   it('bypasses memory cache when refresh=1', async () => {
     const server = createTestServer();
-    const turnFixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const turnFixture = readFixtureBuffer('turn_pair.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/LookUpTURN.php')
@@ -81,7 +81,7 @@ describe('API server', () => {
 
   it('returns per-item mixed results on /api/turns', async () => {
     const server = createTestServer();
-    const turnFixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const turnFixture = readFixtureBuffer('turn_pair.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/LookUpTURN.php')
@@ -113,7 +113,7 @@ describe('API server', () => {
 
   it('reports policy and memory counters in /api/cache-status', async () => {
     const server = createTestServer();
-    const turnFixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const turnFixture = readFixtureBuffer('turn_pair.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/LookUpTURN.php')

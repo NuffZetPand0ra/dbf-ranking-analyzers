@@ -36,7 +36,7 @@ describe('SQLite tournament cache behavior', () => {
   });
 
   it('treats old parser rows as misses after parser version change', async () => {
-    const fixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const fixture = readFixtureBuffer('turn_pair.html');
 
     const v1Fetch = makeFetchReturningFixture(fixture);
     const serverV1 = createServer({
@@ -80,7 +80,7 @@ describe('SQLite tournament cache behavior', () => {
   });
 
   it('purges old parser rows when startup purge is enabled', async () => {
-    const fixture = readFixtureBuffer('Klubmesterskab par ruder es 2026-03-19.html');
+    const fixture = readFixtureBuffer('turn_pair.html');
 
     const seedFetch = makeFetchReturningFixture(fixture);
     const seedServer = createServer({

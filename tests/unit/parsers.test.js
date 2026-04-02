@@ -8,7 +8,7 @@ const { readFixtureText } = require('../helpers/fixtures');
 
 describe('HTML parsers', () => {
   it('parseTurnHtml extracts pair tournament structure', () => {
-    const html = readFixtureText('Klubmesterskab par ruder es 2026-03-19.html');
+    const html = readFixtureText('turn_pair.html');
     const parsed = parseTurnHtml(html);
 
     assert.strictEqual(typeof parsed.title, 'string');
@@ -21,7 +21,7 @@ describe('HTML parsers', () => {
   });
 
   it('parseLookupHtml extracts player handicap timeline', () => {
-    const html = readFixtureText('DBf handicapoversigt for Dennis Bilde.html');
+    const html = readFixtureText('lookup_dennis.html');
     const parsed = parseLookupHtml(html);
 
     assert.strictEqual(typeof parsed.name, 'string');
@@ -36,7 +36,7 @@ describe('HTML parsers', () => {
   });
 
   it('parseLookupHtml handles a second player fixture', () => {
-    const html = readFixtureText('DBf handicapoversigt for Esben Tind.html');
+    const html = readFixtureText('lookup_esben.html');
     const parsed = parseLookupHtml(html);
 
     assert.strictEqual(typeof parsed.name, 'string');
@@ -46,7 +46,7 @@ describe('HTML parsers', () => {
   });
 
   it('parseHacalleHtml extracts ranking list rows', () => {
-    const html = readFixtureText('Handicap rangliste for alle DBf medlemmer.html');
+    const html = readFixtureText('hacalle_rankings.html');
     const parsed = parseHacalleHtml(html);
 
     assert.strictEqual(Array.isArray(parsed), true);

@@ -29,7 +29,7 @@ describe('API server lookup/hacalle', () => {
 
   it('returns MISS then HIT on /api/lookup', async () => {
     const server = createTestServer();
-    const lookupFixture = readFixtureBuffer('DBf handicapoversigt for Dennis Bilde.html');
+    const lookupFixture = readFixtureBuffer('lookup_dennis.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/LookUpHAC.php')
@@ -50,7 +50,7 @@ describe('API server lookup/hacalle', () => {
 
   it('returns MISS then HIT on /api/hacalle', async () => {
     const server = createTestServer();
-    const hacalleFixture = readFixtureBuffer('Handicap rangliste for alle DBf medlemmer.html');
+    const hacalleFixture = readFixtureBuffer('hacalle_rankings.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/HACAlle.php')
@@ -70,7 +70,7 @@ describe('API server lookup/hacalle', () => {
 
   it('supports refresh=1 to bypass /api/hacalle cache', async () => {
     const server = createTestServer();
-    const hacalleFixture = readFixtureBuffer('Handicap rangliste for alle DBf medlemmer.html');
+    const hacalleFixture = readFixtureBuffer('hacalle_rankings.html');
 
     nock('https://medlemmer.bridge.dk')
       .get('/HACAlle.php')
