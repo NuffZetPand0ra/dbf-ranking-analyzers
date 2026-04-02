@@ -809,7 +809,7 @@ function buildStateParams(includeEndDate) {
   if (fromDateEl.value) params.set('from', fromDateEl.value);
   if (includeEndDate && toDateEl.value) params.set('to', toDateEl.value);
 
-  if (granularityEl.value && granularityEl.value !== 'month') params.set('g', granularityEl.value);
+  if (granularityEl.value && granularityEl.value !== 'all') params.set('g', granularityEl.value);
   if (tensionEl.value && tensionEl.value !== '0.1') params.set('t', tensionEl.value);
   if (!showPoints) params.set('sp', '0');
   if (!showHover) params.set('sh', '0');
