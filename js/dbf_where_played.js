@@ -11,6 +11,10 @@ let autocompleteIndex = -1;
 let loadController = null;
 let analysisResult = null;
 let loadRequestSeq = 0;
+let pendingUiState = null;
+let activeTab = 'partners';
+
+const TAB_NAMES = new Set(['partners', 'locations', 'location-detail', 'partner-detail', 'unresolved']);
 
 const searchEl = document.getElementById('wp-search');
 const dropdownEl = document.getElementById('wp-dropdown');
@@ -50,6 +54,33 @@ function parseNumber(value) {
 
 function normalizeName(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function parseUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  const dbfNr = String(params.get('p') || '').replace(/\D/g, '');
+  const tab = params.get('tab');
+  return {
+    dbfNr,
+    tab: TAB_NAMES.has(tab) ? tab : 'partners',
+    location: params.get('loc') || '',
+    partner: params.get('partner') || '',
+  };
+}
+
+function buildStateParams() {
+  const params = new URLSearchParams();
+  if (currentPlayer?.dbfNr) params.set('p', currentPlayer.dbfNr);
+  if (activeTab !== 'partners') params.set('tab', activeTab);
+  if (locationSelectEl.value) params.set('loc', locationSelectEl.value);
+  if (partnerSelectEl.value) params.set('partner', partnerSelectEl.value);
+  return params;
+}
+
+function replaceUrlFromState() {
+  const qs = buildStateParams().toString();
+  const rel = window.location.pathname + (qs ? '?' + qs : '');
+  window.history.replaceState({}, '', rel);
 }
 
 /* ── Normalize upstream responses ── */
@@ -865,6 +896,46 @@ function populateSelect(selectEl, items, placeholder) {
   }
 }
 
+function selectHasValue(selectEl, value) {
+  if (!value) return false;
+  return Array.from(selectEl.options).some(option => option.value === value);
+}
+
+function renderLocationDetailTable() {
+  if (!analysisResult) return;
+  const loc = locationSelectEl.value;
+  if (!loc) {
+    fillTable('wp-table-location-detail', [], 'Makker', 'Turneringer');
+    return;
+  }
+
+  const partnerMap = analysisResult.locationPartnerMap.get(loc);
+  const clubByName = new Map();
+  if (allPlayersData) {
+    for (const p of allPlayersData) clubByName.set(normalizeName(p.name), p.club || '');
+  }
+
+  const rows = partnerMap
+    ? [...partnerMap.entries()].map(([name, count]) => ({ name, count, club: clubByName.get(normalizeName(name)) || '' })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'da'))
+    : [];
+  fillTable('wp-table-location-detail', rows, 'Makker', 'Turneringer');
+}
+
+function renderPartnerDetailTable() {
+  if (!analysisResult) return;
+  const partner = partnerSelectEl.value;
+  if (!partner) {
+    fillTable('wp-table-partner-detail', [], 'Lokation', 'Turneringer');
+    return;
+  }
+
+  const locationMap = analysisResult.partnerLocationMap.get(partner);
+  const rows = locationMap
+    ? [...locationMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'da'))
+    : [];
+  fillTable('wp-table-partner-detail', rows, 'Lokation', 'Turneringer');
+}
+
 /* ── UI: Tabs ── */
 
 const tabs = document.querySelectorAll('.wp-tab');
@@ -877,8 +948,11 @@ const panels = {
 };
 
 function switchTab(tabName) {
+  if (!TAB_NAMES.has(tabName)) tabName = 'partners';
+  activeTab = tabName;
   tabs.forEach(t => t.classList.toggle('wp-tab-active', t.dataset.tab === tabName));
   Object.entries(panels).forEach(([key, panel]) => { panel.style.display = key === tabName ? '' : 'none'; });
+  replaceUrlFromState();
 }
 
 tabs.forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
@@ -925,45 +999,43 @@ function render() {
   populateSelect(locationSelectEl, r.locationTotals, 'Vælg lokation...');
   populateSelect(partnerSelectEl, r.partnerTotals, 'Vælg makker...');
 
-  // Reset detail tables
-  fillTable('wp-table-location-detail', [], 'Makker', 'Turneringer');
-  fillTable('wp-table-partner-detail', [], 'Lokation', 'Turneringer');
+  const stateToApply = pendingUiState;
+  pendingUiState = null;
 
-  switchTab('partners');
+  if (stateToApply && selectHasValue(locationSelectEl, stateToApply.location)) {
+    locationSelectEl.value = stateToApply.location;
+  } else {
+    locationSelectEl.value = '';
+  }
+
+  if (stateToApply && selectHasValue(partnerSelectEl, stateToApply.partner)) {
+    partnerSelectEl.value = stateToApply.partner;
+  } else {
+    partnerSelectEl.value = '';
+  }
+
+  renderLocationDetailTable();
+  renderPartnerDetailTable();
+  switchTab(stateToApply?.tab || 'partners');
 }
 
 /* ── Detail selects ── */
 
 locationSelectEl.addEventListener('change', () => {
-  if (!analysisResult) return;
-  const loc = locationSelectEl.value;
-  if (!loc) { fillTable('wp-table-location-detail', [], 'Makker', 'Turneringer'); return; }
-  const partnerMap = analysisResult.locationPartnerMap.get(loc);
-  const clubByName = new Map();
-  if (allPlayersData) {
-    for (const p of allPlayersData) clubByName.set(normalizeName(p.name), p.club || '');
-  }
-  const rows = partnerMap
-    ? [...partnerMap.entries()].map(([name, count]) => ({ name, count, club: clubByName.get(normalizeName(name)) || '' })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'da'))
-    : [];
-  fillTable('wp-table-location-detail', rows, 'Makker', 'Turneringer');
+  renderLocationDetailTable();
+  replaceUrlFromState();
 });
 
 partnerSelectEl.addEventListener('change', () => {
-  if (!analysisResult) return;
-  const partner = partnerSelectEl.value;
-  if (!partner) { fillTable('wp-table-partner-detail', [], 'Lokation', 'Turneringer'); return; }
-  const locationMap = analysisResult.partnerLocationMap.get(partner);
-  const rows = locationMap
-    ? [...locationMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'da'))
-    : [];
-  fillTable('wp-table-partner-detail', rows, 'Lokation', 'Turneringer');
+  renderPartnerDetailTable();
+  replaceUrlFromState();
 });
 
 /* ── Load player ── */
 
-async function loadPlayer(dbfNr) {
+async function loadPlayer(dbfNr, options = {}) {
   if (!dbfNr) return;
+  pendingUiState = options.restoreState || null;
   const requestSeq = ++loadRequestSeq;
   setStatus('Henter...', '');
   setLoadStatus('', '');
@@ -1079,9 +1151,10 @@ searchEl.addEventListener('keydown', e => {
 /* ── URL state ── */
 
 (async function restoreFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const dbfNr = params.get('p');
-  if (dbfNr) await loadPlayer(dbfNr);
+  const state = parseUrlState();
+  if (state.dbfNr) {
+    await loadPlayer(state.dbfNr, { restoreState: state });
+  }
 })().finally(() => {
   fetchAllPlayers().catch(() => {});
 });
