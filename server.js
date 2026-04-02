@@ -21,6 +21,425 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+function buildOpenApiSpec() {
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'DBf Ranking Analyzers API',
+      version: '1.0.0',
+      description: 'Relay and cache API for DBf handicap data. All endpoints proxy data from Danmarks Bridgeforbund and cache responses to reduce upstream load.',
+    },
+    tags: [
+      { name: 'Data', description: 'Fetch and cache DBf data' },
+      { name: 'Cache', description: 'Inspect and manage server-side caches' },
+    ],
+    paths: {
+      '/api/hacalle': {
+        get: {
+          tags: ['Data'],
+          summary: 'All players with current handicap',
+          description: 'Returns the full HACAlle player list. Cached for 12 hours. Use `refresh=1` to force an upstream re-fetch.',
+          parameters: [
+            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['1'] }, description: 'Force upstream re-fetch and update cache' },
+          ],
+          responses: {
+            200: {
+              description: 'Player list',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  players: { type: 'array', items: { '$ref': '#/components/schemas/Player' } },
+                  cachedAt: { type: 'integer', description: 'Unix timestamp ms when this entry was cached' },
+                  cache: { type: 'string', enum: ['HIT', 'MISS'] },
+                },
+              } } },
+            },
+            502: { '$ref': '#/components/responses/UpstreamError' },
+          },
+        },
+      },
+      '/api/lookup': {
+        get: {
+          tags: ['Data'],
+          summary: 'Individual player handicap history',
+          parameters: [
+            { name: 'dbfNr', in: 'query', required: true, schema: { type: 'string' }, description: 'DBf member number' },
+            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['1'] }, description: 'Force upstream re-fetch' },
+          ],
+          responses: {
+            200: {
+              description: 'Player handicap timeline',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  dbfNr: { type: 'string' },
+                  entries: { type: 'array', items: { '$ref': '#/components/schemas/LookupEntry' } },
+                  cachedAt: { type: 'integer' },
+                  cache: { type: 'string', enum: ['HIT', 'MISS'] },
+                },
+              } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+            502: { '$ref': '#/components/responses/UpstreamError' },
+          },
+        },
+      },
+      '/api/turn': {
+        get: {
+          tags: ['Data'],
+          summary: 'Single tournament details',
+          parameters: [
+            { name: 'turnId', in: 'query', required: true, schema: { type: 'string' }, description: 'DBf tournament ID' },
+            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['1'] }, description: 'Bypass memory cache and re-fetch' },
+          ],
+          responses: {
+            200: {
+              description: 'Tournament details',
+              content: { 'application/json': { schema: { '$ref': '#/components/schemas/TurnResult' } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+            502: { '$ref': '#/components/responses/UpstreamError' },
+          },
+        },
+      },
+      '/api/turns': {
+        get: {
+          tags: ['Data'],
+          summary: 'Batch tournament details',
+          description: 'Returns details for multiple tournaments in a single request. IDs are fetched concurrently with up to 8 workers. At most 75 IDs per request. Served from memory/SQLite cache where possible.',
+          parameters: [
+            { name: 'ids', in: 'query', required: true, schema: { type: 'string' }, description: 'Comma-separated list of tournament IDs, e.g. `12345,67890`' },
+          ],
+          responses: {
+            200: {
+              description: 'Per-tournament results (mixed success/error)',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  results: { type: 'array', items: { '$ref': '#/components/schemas/TurnBatchItem' } },
+                },
+              } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+          },
+        },
+      },
+      '/api/cache-status': {
+        get: {
+          tags: ['Cache'],
+          summary: 'Cache health and statistics',
+          responses: {
+            200: {
+              description: 'Cache status',
+              content: { 'application/json': { schema: { '$ref': '#/components/schemas/CacheStatus' } } },
+            },
+          },
+        },
+      },
+      '/api/cache/refresh/hacalle': {
+        post: {
+          tags: ['Cache'],
+          summary: 'Force refresh the HACAlle cache',
+          responses: {
+            200: {
+              description: 'Refreshed player list',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  players: { type: 'array', items: { '$ref': '#/components/schemas/Player' } },
+                  cachedAt: { type: 'integer' },
+                  cache: { type: 'string', enum: ['REFRESH'] },
+                  refreshed: { type: 'boolean' },
+                },
+              } } },
+            },
+            502: { '$ref': '#/components/responses/UpstreamError' },
+          },
+        },
+      },
+      '/api/cache/refresh/lookup': {
+        post: {
+          tags: ['Cache'],
+          summary: 'Force refresh one player lookup cache',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: {
+              type: 'object',
+              required: ['dbfNr'],
+              properties: { dbfNr: { type: 'string', description: 'DBf member number' } },
+            } } },
+          },
+          responses: {
+            200: {
+              description: 'Refreshed player entry',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  dbfNr: { type: 'string' },
+                  entries: { type: 'array', items: { '$ref': '#/components/schemas/LookupEntry' } },
+                  cachedAt: { type: 'integer' },
+                  cache: { type: 'string', enum: ['REFRESH'] },
+                  refreshed: { type: 'boolean' },
+                },
+              } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+            502: { '$ref': '#/components/responses/UpstreamError' },
+          },
+        },
+      },
+      '/api/cache/clear/hacalle': {
+        post: {
+          tags: ['Cache'],
+          summary: 'Clear the HACAlle memory cache',
+          responses: {
+            200: {
+              description: 'Cleared',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  cacheType: { type: 'string', enum: ['hacalle'] },
+                  cleared: { type: 'integer', description: '1 if an entry was evicted, 0 if already empty' },
+                },
+              } } },
+            },
+          },
+        },
+      },
+      '/api/cache/clear/lookup': {
+        post: {
+          tags: ['Cache'],
+          summary: 'Clear one or all player lookup cache entries',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: {
+              type: 'object',
+              properties: {
+                dbfNr: { type: 'string', description: 'Clear a single player entry' },
+                all: { type: 'boolean', description: 'Set to true to clear all player entries' },
+              },
+            } } },
+          },
+          responses: {
+            200: {
+              description: 'Cleared',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  cacheType: { type: 'string', enum: ['lookup'] },
+                  dbfNr: { type: 'string', nullable: true },
+                  cleared: { type: 'integer' },
+                  all: { type: 'boolean' },
+                },
+              } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+          },
+        },
+      },
+      '/api/cache/clear/turns': {
+        post: {
+          tags: ['Cache'],
+          summary: 'Clear one or all tournament cache entries',
+          description: 'Clears from both the in-memory cache and the SQLite persistent cache.',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: {
+              type: 'object',
+              properties: {
+                turnId: { type: 'string', description: 'Clear a single tournament' },
+                all: { type: 'boolean', description: 'Set to true to clear all tournament entries' },
+              },
+            } } },
+          },
+          responses: {
+            200: {
+              description: 'Cleared',
+              content: { 'application/json': { schema: {
+                type: 'object',
+                properties: {
+                  cacheType: { type: 'string', enum: ['turns'] },
+                  turnId: { type: 'string', nullable: true },
+                  all: { type: 'boolean' },
+                  memoryCleared: { type: 'integer' },
+                  persistentCleared: { type: 'integer' },
+                },
+              } } },
+            },
+            400: { '$ref': '#/components/responses/BadRequest' },
+          },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        Player: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            club: { type: 'string' },
+            dbfNr: { type: 'string' },
+            hc: { type: 'number' },
+          },
+        },
+        LookupEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            seq: { type: 'integer' },
+            date: { type: 'string', format: 'date' },
+            tournament: { type: 'string' },
+            club: { type: 'string' },
+            change: { type: 'number', nullable: true },
+            hc: { type: 'number' },
+            turnId: { type: 'string', nullable: true },
+            sourceLabel: { type: 'string' },
+          },
+        },
+        TurnPlayer: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            direction: { type: 'string' },
+          },
+        },
+        TurnGroup: {
+          type: 'object',
+          properties: {
+            groupKey: { type: 'string' },
+            players: { type: 'array', items: { '$ref': '#/components/schemas/TurnPlayer' } },
+          },
+        },
+        TurnResult: {
+          type: 'object',
+          properties: {
+            turnId: { type: 'string' },
+            title: { type: 'string' },
+            organizer: { type: 'string' },
+            playedAt: { type: 'string' },
+            postedAt: { type: 'string' },
+            formatHint: { type: 'string', enum: ['pair', 'team-known-seating', 'unknown'] },
+            groups: { type: 'array', items: { '$ref': '#/components/schemas/TurnGroup' } },
+            cachedAt: { type: 'integer' },
+            cache: { type: 'string', enum: ['HIT', 'MISS'] },
+            cacheSource: { type: 'string', enum: ['memory', 'sqlite', 'upstream'] },
+          },
+        },
+        TurnBatchItem: {
+          type: 'object',
+          description: 'Either a successful TurnResult or an error entry',
+          properties: {
+            turnId: { type: 'string' },
+            title: { type: 'string' },
+            organizer: { type: 'string' },
+            playedAt: { type: 'string' },
+            postedAt: { type: 'string' },
+            formatHint: { type: 'string' },
+            groups: { type: 'array', items: { '$ref': '#/components/schemas/TurnGroup' } },
+            cachedAt: { type: 'integer' },
+            cache: { type: 'string' },
+            cacheSource: { type: 'string' },
+            error: { type: 'string', description: 'Present on failure' },
+            status: { type: 'integer', description: 'Upstream HTTP status on failure' },
+          },
+        },
+        SqliteCacheStats: {
+          type: 'object',
+          properties: {
+            totalRows: { type: 'integer' },
+            currentVersionRows: { type: 'integer' },
+            otherVersionRows: { type: 'integer' },
+            immutableRows: { type: 'integer' },
+            mutableRows: { type: 'integer' },
+            expiredMutableRows: { type: 'integer' },
+          },
+        },
+        CacheStatus: {
+          type: 'object',
+          properties: {
+            now: { type: 'integer' },
+            cachePolicy: {
+              type: 'object',
+              properties: {
+                mutableTtlHours: { type: 'integer' },
+                immutableDays: { type: 'integer' },
+                parserVersion: { type: 'string' },
+              },
+            },
+            memoryCache: {
+              type: 'object',
+              properties: {
+                freshEntries: { type: 'integer' },
+                staleEntries: { type: 'integer' },
+              },
+            },
+            sqliteCache: {
+              type: 'object',
+              properties: {
+                enabled: { type: 'boolean' },
+                reason: { type: 'string', nullable: true },
+                dbPath: { type: 'string', nullable: true },
+                parserVersion: { type: 'string', nullable: true },
+                stats: { '$ref': '#/components/schemas/SqliteCacheStats' },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        BadRequest: {
+          description: 'Bad request',
+          content: { 'application/json': { schema: {
+            type: 'object',
+            properties: { error: { type: 'string' } },
+          } } },
+        },
+        UpstreamError: {
+          description: 'Upstream DBf request failed',
+          content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              error: { type: 'string' },
+              status: { type: 'integer', nullable: true },
+              message: { type: 'string', nullable: true },
+            },
+          } } },
+        },
+      },
+    },
+  };
+}
+
+const SWAGGER_UI_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DBf Ranking Analyzers – API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; }
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/api/openapi.json',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'BaseLayout',
+      deepLinking: true,
+      tryItOutEnabled: true,
+    });
+  </script>
+</body>
+</html>
+`;
+
 function readConfigFromEnv(env = process.env) {
   const root = process.cwd();
   return {
@@ -707,6 +1126,17 @@ function createServer(options = {}) {
 
     if (req.method !== 'GET') {
       sendJson(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/docs') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(SWAGGER_UI_HTML);
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/openapi.json') {
+      sendJson(res, 200, buildOpenApiSpec());
       return;
     }
 
