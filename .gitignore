@@ -9,3 +9,4 @@ sample_html/
 !.gitignore
 !.eleventy.js
 !.well-known/
+!.github/
