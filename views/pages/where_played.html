@@ -32,6 +32,14 @@ permalink: /tools/where-played/index.html
   <div class="wp-control-row">
     <span class="wp-load-status" id="wp-load-status"></span>
   </div>
+  <div class="wp-control-row">
+    <div class="wp-progress-wrap" id="wp-progress-wrap" style="display:none" aria-live="polite">
+      <div class="wp-progress-track" role="progressbar" aria-label="Turneringsindlæsning" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="wp-progress-bar" id="wp-progress-bar"></div>
+      </div>
+      <div class="wp-progress-meta" id="wp-progress-meta"></div>
+    </div>
+  </div>
 </div>
 
 <div class="wp-empty" id="wp-empty">Søg efter en spiller for at se turneringslokationer og makkere.</div>
@@ -58,6 +66,7 @@ permalink: /tools/where-played/index.html
     <button class="wp-tab" data-tab="locations">Lokationer (total)</button>
     <button class="wp-tab" data-tab="location-detail">Lokation → Makkere</button>
     <button class="wp-tab" data-tab="partner-detail">Makker → Lokationer</button>
+    <button class="wp-tab" data-tab="unresolved">Uafklarede turneringer</button>
   </div>
 
   <section class="wp-panel card" id="wp-panel-partners">
@@ -113,6 +122,19 @@ permalink: /tools/where-played/index.html
     <div class="wp-table-wrap">
       <table class="wp-table" id="wp-table-partner-detail">
         <thead><tr><th>Lokation</th><th>Turneringer</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wp-panel card" id="wp-panel-unresolved" style="display:none">
+    <div class="wp-panel-head">
+      <h3>Uafklarede turneringer</h3>
+      <p class="wp-panel-sub">Turneringer hvor makkerrelation ikke kunne udledes, eller hvor turneringsdata mangler.</p>
+    </div>
+    <div class="wp-table-wrap">
+      <table class="wp-table" id="wp-table-unresolved">
+        <thead><tr><th>Dato</th><th>Turnering</th><th>Lokation</th><th>Årsag</th><th>Link</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>

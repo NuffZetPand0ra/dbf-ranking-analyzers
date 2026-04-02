@@ -10,11 +10,15 @@ let allPlayersData = null;
 let autocompleteIndex = -1;
 let loadController = null;
 let analysisResult = null;
+let loadRequestSeq = 0;
 
 const searchEl = document.getElementById('wp-search');
 const dropdownEl = document.getElementById('wp-dropdown');
 const statusEl = document.getElementById('wp-status');
 const loadStatusEl = document.getElementById('wp-load-status');
+const progressWrapEl = document.getElementById('wp-progress-wrap');
+const progressBarEl = document.getElementById('wp-progress-bar');
+const progressMetaEl = document.getElementById('wp-progress-meta');
 const emptyEl = document.getElementById('wp-empty');
 const wrapEl = document.getElementById('wp-wrap');
 const playerEl = document.getElementById('wp-player');
@@ -27,6 +31,15 @@ const locationSelectEl = document.getElementById('wp-location-select');
 const partnerSelectEl = document.getElementById('wp-partner-select');
 
 const turnDataMemo = new Map();
+const TURN_BATCH_SIZE = 75;
+const TURN_BATCH_CONCURRENCY = 3;
+const ETA_RECALC_INTERVAL_MS = 20 * 1000;
+const ETA_TICK_MS = 1000;
+
+let etaTicker = null;
+let etaTargetAtMs = null;
+let etaNextRecalcAtMs = 0;
+let latestLoadProgress = null;
 
 /* ── Helpers ── */
 
@@ -132,8 +145,8 @@ function writeCache(prefix, key, data) {
 
 /* ── Fetchers ── */
 
-async function fetchLookupData(dbfNr) {
-  const res = await fetch('/api/lookup?dbfNr=' + encodeURIComponent(dbfNr));
+async function fetchLookupData(dbfNr, signal) {
+  const res = await fetch('/api/lookup?dbfNr=' + encodeURIComponent(dbfNr), { signal });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return await res.json();
 }
@@ -146,7 +159,25 @@ function getCachedTurnData(turnId) {
   return undefined; // not cached
 }
 
-async function fetchTurnDataBatch(turnIds, signal) {
+function chunkArray(list, size) {
+  const chunks = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function estimateEtaSeconds(startedAtMs, completedUncached, totalUncached) {
+  if (!startedAtMs || completedUncached <= 0 || totalUncached <= completedUncached) return null;
+  const elapsedSeconds = (Date.now() - startedAtMs) / 1000;
+  if (elapsedSeconds <= 0) return null;
+  const perSecond = completedUncached / elapsedSeconds;
+  if (!Number.isFinite(perSecond) || perSecond <= 0) return null;
+  const remaining = totalUncached - completedUncached;
+  return Math.max(1, Math.ceil(remaining / perSecond));
+}
+
+async function fetchTurnDataBatch(turnIds, signal, onProgress) {
   // Partition into cached and uncached
   const results = new Map();
   const uncachedIds = [];
@@ -156,23 +187,82 @@ async function fetchTurnDataBatch(turnIds, signal) {
     else { uncachedIds.push(id); }
   }
 
-  // Fetch uncached in a single batch request (POST to avoid URI length limits)
-  if (uncachedIds.length) {
-    const res = await fetch('/api/turns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: uncachedIds }),
-      signal,
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    for (const item of json.results) {
-      if (item.error) { results.set(item.turnId, null); continue; }
-      const normalized = normalizeTurnResponse(item);
-      if (normalized) { writeCache(TURN_CACHE_PREFIX, item.turnId, item); turnDataMemo.set(item.turnId, normalized); }
-      results.set(item.turnId, normalized);
+  const progressState = {
+    total: turnIds.length,
+    done: results.size,
+    cached: results.size,
+    fetched: 0,
+    failed: 0,
+    etaSeconds: null,
+  };
+  if (onProgress) onProgress(progressState);
+
+  if (!uncachedIds.length) {
+    return results;
+  }
+
+  const startedAtMs = Date.now();
+  const chunks = chunkArray(uncachedIds, TURN_BATCH_SIZE);
+  let nextChunk = 0;
+
+  async function worker() {
+    while (nextChunk < chunks.length) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      const idx = nextChunk++;
+      const chunk = chunks[idx];
+
+      const res = await fetch('/api/turns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: chunk }),
+        signal,
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const json = await res.json();
+      const responseItems = Array.isArray(json.results) ? json.results : [];
+      const seenIds = new Set();
+
+      for (const item of responseItems) {
+        const turnId = String(item?.turnId ?? '').replace(/\D/g, '');
+        if (!turnId || seenIds.has(turnId)) continue;
+        seenIds.add(turnId);
+
+        if (item.error) {
+          results.set(turnId, null);
+          progressState.failed++;
+          continue;
+        }
+
+        const normalized = normalizeTurnResponse(item);
+        if (normalized) {
+          writeCache(TURN_CACHE_PREFIX, turnId, item);
+          turnDataMemo.set(turnId, normalized);
+          results.set(turnId, normalized);
+        } else {
+          results.set(turnId, null);
+          progressState.failed++;
+        }
+      }
+
+      for (const requestedId of chunk) {
+        if (seenIds.has(requestedId)) continue;
+        if (!results.has(requestedId)) {
+          results.set(requestedId, null);
+          progressState.failed++;
+        }
+      }
+
+      progressState.fetched += chunk.length;
+      progressState.done = progressState.cached + progressState.fetched;
+      progressState.etaSeconds = estimateEtaSeconds(startedAtMs, progressState.fetched, uncachedIds.length);
+      if (onProgress) onProgress(progressState);
     }
   }
+
+  const workers = Array.from({ length: Math.min(TURN_BATCH_CONCURRENCY, chunks.length) }, () => worker());
+  await Promise.all(workers);
 
   return results;
 }
@@ -222,6 +312,98 @@ function setLoadStatus(msg, cls, showCancel) {
   }
 }
 
+function formatDurationHms(seconds) {
+  const total = Math.max(0, Math.round(seconds || 0));
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function formatClockHms(timestampMs) {
+  if (!timestampMs) return '';
+  const d = new Date(timestampMs);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function stopEtaTicker() {
+  if (etaTicker) {
+    clearInterval(etaTicker);
+    etaTicker = null;
+  }
+}
+
+function renderProgressMeta() {
+  if (!progressMetaEl || !latestLoadProgress) return;
+  const progress = latestLoadProgress;
+
+  const failText = progress.failed ? ` · fejl ${progress.failed}` : '';
+  let etaText = '';
+
+  if (etaTargetAtMs && progress.done < progress.total) {
+    const remainingSeconds = Math.max(0, Math.ceil((etaTargetAtMs - Date.now()) / 1000));
+    etaText = ` · est. færdig ${formatClockHms(etaTargetAtMs)} · tilbage ${formatDurationHms(remainingSeconds)}`;
+  }
+
+  progressMetaEl.textContent = `${progress.done}/${progress.total} · cache ${progress.cached} · hentet ${progress.fetched}${failText}${etaText}`;
+}
+
+function setLoadProgress(progress) {
+  if (!progressWrapEl || !progressBarEl || !progressMetaEl) return;
+  if (!progress || !progress.total) {
+    latestLoadProgress = null;
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
+    progressWrapEl.style.display = 'none';
+    progressBarEl.style.width = '0%';
+    progressMetaEl.textContent = '';
+    return;
+  }
+
+  latestLoadProgress = {
+    total: progress.total,
+    done: progress.done,
+    cached: progress.cached,
+    fetched: progress.fetched,
+    failed: progress.failed,
+  };
+
+  progressWrapEl.style.display = '';
+  const pct = Math.max(0, Math.min(100, (progress.done / progress.total) * 100));
+  const track = progressBarEl.parentElement;
+  if (track) track.setAttribute('aria-valuenow', String(Math.round(pct)));
+  progressBarEl.style.width = `${pct}%`;
+
+  const now = Date.now();
+  if (progress.etaSeconds && progress.done < progress.total) {
+    if (!etaTargetAtMs || now >= etaNextRecalcAtMs) {
+      etaTargetAtMs = now + progress.etaSeconds * 1000;
+      etaNextRecalcAtMs = now + ETA_RECALC_INTERVAL_MS;
+    }
+    if (!etaTicker) {
+      etaTicker = setInterval(() => {
+        if (!latestLoadProgress || latestLoadProgress.done >= latestLoadProgress.total) {
+          stopEtaTicker();
+          return;
+        }
+        renderProgressMeta();
+      }, ETA_TICK_MS);
+    }
+  }
+
+  if (progress.done >= progress.total) {
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
+  }
+
+  renderProgressMeta();
+}
+
 /* ── Autocomplete ── */
 
 function playerMatchesQuery(player, query) {
@@ -263,15 +445,16 @@ async function handleSearchInput() {
 
 /* ── Core analysis ── */
 
-async function analyzePlayer(player, signal) {
+async function analyzePlayer(player, signal, onProgress) {
   const entries = player.entries.filter(e => e.turnId);
   const turnIds = [...new Set(entries.map(e => e.turnId))];
   const playerKey = normalizeName(player.name);
 
-  const turnResultsMap = await fetchTurnDataBatch(turnIds, signal);
+  const turnResultsMap = await fetchTurnDataBatch(turnIds, signal, onProgress);
 
   // Map turnId -> { partners[], location, title }
   const turnInfo = new Map();
+  const unresolvedReasonByTurnId = new Map();
   let resolvedTurns = 0;
   let unresolvedTurns = 0;
 
@@ -279,6 +462,12 @@ async function analyzePlayer(player, signal) {
     const turn = turnResultsMap.get(turnId) || null;
     if (!turn || !turn.groups.length) {
       unresolvedTurns++;
+      unresolvedReasonByTurnId.set(
+        turnId,
+        turn
+          ? (turn.formatHint === 'unknown' ? 'Ukendt turneringsformat eller manglende spillerplacering' : 'Mangler spillergrupper i turneringsdata')
+          : 'Kunne ikke hente turneringsdata'
+      );
       if (turn) {
         turnInfo.set(turnId, { partners: [], location: turn.organizer || '', title: turn.title });
       }
@@ -312,6 +501,7 @@ async function analyzePlayer(player, signal) {
       turnInfo.set(turnId, { partners: [...new Set(linkedPlayers)], location, title: turn.title });
     } else {
       unresolvedTurns++;
+      unresolvedReasonByTurnId.set(turnId, 'Ingen makkerrelation fundet for spilleren');
       turnInfo.set(turnId, { partners: [], location, title: turn.title });
     }
   }
@@ -333,6 +523,7 @@ async function analyzePlayer(player, signal) {
   const partnerLocationMap = new Map();   // partnerName -> Map<location, count>
   const locationPartnerMap = new Map();   // location -> Map<partnerName, count>
   const partnerEventsMap = new Map();     // partnerName -> [{ date, dateIso, location, tournament, change, hc, turnId }]
+  const unresolvedRows = [];
 
   const processedTurnIds = new Set();
 
@@ -343,9 +534,30 @@ async function analyzePlayer(player, signal) {
 
     const info = entry.turnId ? turnInfo.get(entry.turnId) : null;
     const location = entry.sourceLabel || entry.club || info?.location || '';
+    const tournamentTitle = info?.title || entry.tournament || '';
 
     if (location) {
       locationTotalMap.set(location, (locationTotalMap.get(location) || 0) + 1);
+    }
+
+    if (!entry.turnId) {
+      unresolvedRows.push({
+        date: entry.date,
+        dateIso: entry.dateIso,
+        tournament: tournamentTitle,
+        location,
+        reason: 'Mangler TurnID i handicaphistorik',
+        turnId: null,
+      });
+    } else if (!info || !info.partners?.length) {
+      unresolvedRows.push({
+        date: entry.date,
+        dateIso: entry.dateIso,
+        tournament: tournamentTitle,
+        location,
+        reason: unresolvedReasonByTurnId.get(entry.turnId) || 'Makkerrelation kunne ikke udledes',
+        turnId: entry.turnId,
+      });
     }
 
     if (info?.partners?.length) {
@@ -385,6 +597,7 @@ async function analyzePlayer(player, signal) {
 
   const partnerTotals = [...partnerTotalMap.entries()].map(([name, count]) => ({ name, count })).sort(sortByCount);
   const locationTotals = [...locationTotalMap.entries()].map(([name, count]) => ({ name, count })).sort(sortByCount);
+  unresolvedRows.sort((a, b) => b.date - a.date || a.tournament.localeCompare(b.tournament, 'da'));
 
   return {
     partnerTotals,
@@ -392,6 +605,7 @@ async function analyzePlayer(player, signal) {
     partnerLocationMap,
     locationPartnerMap,
     partnerEventsMap,
+    unresolvedRows,
     resolvedTurns,
     unresolvedTurns,
     totalEntries: processedTurnIds.size,
@@ -586,6 +800,57 @@ function fillPartnerTree(tableId, partners, eventsMap) {
   }
 }
 
+function fillUnresolvedTable(tableId, rows) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = '';
+
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    td.className = 'wp-table-empty';
+    td.textContent = 'Ingen uafklarede turneringer';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.textContent = row.date ? fmtDateShort(row.date) : '';
+
+    const tdTournament = document.createElement('td');
+    tdTournament.textContent = row.tournament || '';
+
+    const tdLocation = document.createElement('td');
+    tdLocation.textContent = row.location || '';
+
+    const tdReason = document.createElement('td');
+    tdReason.textContent = row.reason || '';
+
+    const tdLink = document.createElement('td');
+    if (row.turnId) {
+      const link = document.createElement('a');
+      link.className = 'wp-tree-link';
+      link.href = 'https://medlemmer.bridge.dk/LookUpTURN.php?TurnID=' + encodeURIComponent(row.turnId);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'DBf';
+      link.title = 'Åbn turnering på bridge.dk';
+      tdLink.appendChild(link);
+    } else {
+      tdLink.textContent = '–';
+      tdLink.className = 'wp-table-dim';
+    }
+
+    tr.append(tdDate, tdTournament, tdLocation, tdReason, tdLink);
+    tbody.appendChild(tr);
+  }
+}
+
 function populateSelect(selectEl, items, placeholder) {
   selectEl.innerHTML = '';
   const opt = document.createElement('option');
@@ -608,6 +873,7 @@ const panels = {
   locations: document.getElementById('wp-panel-locations'),
   'location-detail': document.getElementById('wp-panel-location-detail'),
   'partner-detail': document.getElementById('wp-panel-partner-detail'),
+  unresolved: document.getElementById('wp-panel-unresolved'),
 };
 
 function switchTab(tabName) {
@@ -654,6 +920,7 @@ function render() {
 
   fillPartnerTree('wp-table-partners', r.partnerTotals, r.partnerEventsMap);
   fillTable('wp-table-locations', r.locationTotals, 'Lokation', 'Turneringer');
+  fillUnresolvedTable('wp-table-unresolved', r.unresolvedRows || []);
 
   populateSelect(locationSelectEl, r.locationTotals, 'Vælg lokation...');
   populateSelect(partnerSelectEl, r.partnerTotals, 'Vælg makker...');
@@ -697,8 +964,10 @@ partnerSelectEl.addEventListener('change', () => {
 
 async function loadPlayer(dbfNr) {
   if (!dbfNr) return;
+  const requestSeq = ++loadRequestSeq;
   setStatus('Henter...', '');
   setLoadStatus('', '');
+  setLoadProgress(null);
   analysisResult = null;
   currentPlayer = null;
   render(); // clear previous results immediately
@@ -707,16 +976,18 @@ async function loadPlayer(dbfNr) {
   loadController = new AbortController();
 
   try {
+    setLoadStatus('Henter spillerhistorik...', '', true);
     const normalizedDbfNr = String(dbfNr).replace(/\D/g, '');
 
     // Fetch player lookup data
     let data = readCache(LOOKUP_CACHE_PREFIX, normalizedDbfNr, LOOKUP_CACHE_MAX_AGE_MS, normalizeLookupResponse);
     if (!data) {
-      const raw = await fetchLookupData(normalizedDbfNr);
+      const raw = await fetchLookupData(normalizedDbfNr, loadController.signal);
       data = normalizeLookupResponse(raw);
       if (!data) throw new Error('Kunne ikke fortolke spillerhistorik');
       writeCache(LOOKUP_CACHE_PREFIX, normalizedDbfNr, raw);
     }
+    if (requestSeq !== loadRequestSeq) return;
 
     let club = '';
     try {
@@ -724,6 +995,7 @@ async function loadPlayer(dbfNr) {
       const match = allPlayers.find(p => p.dbfNr === normalizedDbfNr);
       if (match) club = match.club || '';
     } catch {}
+    if (requestSeq !== loadRequestSeq) return;
 
     currentPlayer = { ...data, dbfNr: normalizedDbfNr, club };
 
@@ -731,7 +1003,15 @@ async function loadPlayer(dbfNr) {
     setStatus('Indlæst: ' + data.name, 'ok');
     setLoadStatus(`Henter detaljer om ${turnCount} turneringer for ${data.name}`, '', true);
 
-    const result = await analyzePlayer(currentPlayer, loadController.signal);
+    const onProgress = progress => {
+      if (requestSeq !== loadRequestSeq) return;
+      setLoadProgress(progress);
+      setLoadStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}`, '', true);
+    };
+
+    const result = await analyzePlayer(currentPlayer, loadController.signal, onProgress);
+    if (requestSeq !== loadRequestSeq) return;
+
     analysisResult = result;
 
     setLoadStatus(
@@ -743,11 +1023,13 @@ async function loadPlayer(dbfNr) {
   } catch (err) {
     if (err.name === 'AbortError') {
       setLoadStatus('Annulleret', 'err');
+      setLoadProgress(null);
     } else {
       setStatus('Fejl: ' + err.message, 'err');
+      setLoadProgress(null);
     }
   } finally {
-    loadController = null;
+    if (requestSeq === loadRequestSeq) loadController = null;
   }
 }
 
