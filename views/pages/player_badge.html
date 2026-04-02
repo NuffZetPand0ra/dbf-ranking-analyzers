@@ -41,6 +41,14 @@ permalink: /tools/player-badge/index.html
     <div><span class="lbl">Fra dato</span><input type="date" id="badge-from"></div>
     <div><span class="lbl">Prognose fra</span><input type="date" id="badge-to"></div>
     <div>
+      <span class="lbl">Prognosemodel</span>
+      <select id="badge-pred-type">
+        <option value="weighted">Vægtet lineær</option>
+        <option value="linear">Lineær</option>
+        <option value="holt">Holt trend</option>
+      </select>
+    </div>
+    <div>
       <span class="lbl">Prognose (mdr.)</span>
       <input type="number" id="badge-pred-months" value="12" min="1" max="120" step="1" style="width:72px">
     </div>
@@ -52,17 +60,36 @@ permalink: /tools/player-badge/index.html
 
   <!-- Row 3: Optimism + actions -->
   <div class="badge-control-row">
+    <label class="badge-pred-toggle">
+      <input type="checkbox" id="badge-pred-enabled" checked>
+      Vis prognose
+    </label>
     <span class="lbl-inline">Pessimistisk</span>
     <input type="range" id="badge-optimism" min="-2" max="2" step="0.1" value="0" style="width:140px;accent-color:var(--accent)">
     <span class="lbl-inline">Optimistisk</span>
     <span class="badge-opt-val" id="badge-opt-val">0.0</span>
-    <span class="add-btn badge-toggle-btn on" id="badge-toggle-hover">Hover</span>
     <span class="add-btn" id="badge-embed-url-btn">Embed link</span>
     <span class="add-btn" id="badge-embed-btn">Iframe</span>
     <span class="add-btn" id="badge-share-btn">Del link</span>
     <span class="add-btn" id="badge-export-btn">💾 Gem badge</span>
   </div>
 </div>
+
+<section class="badge-model-notes" aria-labelledby="badge-model-notes-title">
+  <h2 id="badge-model-notes-title">Om prognosemodeller</h2>
+  <p>Vælg den model, der passer bedst til spillerens udvikling:</p>
+  <ul>
+    <li><strong>Lineær:</strong> En klassisk ret linje gennem perioden. God som neutral baseline.
+      <a href="https://en.wikipedia.org/wiki/Linear_regression" target="_blank" rel="noopener noreferrer">Wikipedia: Linear regression</a>
+    </li>
+    <li><strong>Vægtet lineær:</strong> Som lineær, men nyere resultater vægter mere end ældre.
+      <a href="https://en.wikipedia.org/wiki/Weighted_least_squares" target="_blank" rel="noopener noreferrer">Wikipedia: Weighted least squares</a>
+    </li>
+    <li><strong>Holt trend:</strong> Trend-udglatning med fokus på nyere bevægelser og momentum.
+      <a href="https://en.wikipedia.org/wiki/Exponential_smoothing#Double_exponential_smoothing" target="_blank" rel="noopener noreferrer">Wikipedia: Double exponential smoothing</a>
+    </li>
+  </ul>
+</section>
 
 <!-- ── Empty state ─────────────────────────────────────────── -->
 <div class="badge-empty" id="badge-empty">Søg efter en spiller ovenfor for at generere et badge.</div>
@@ -96,9 +123,9 @@ permalink: /tools/player-badge/index.html
         <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#378ADD" stroke-width="2.5"/></svg>
         Faktisk HC
       </span>
-      <span class="badge-legend-line">
+      <span class="badge-legend-line" id="badge-pred-legend-line-pred">
         <svg width="24" height="6"><line x1="0" y1="3" x2="24" y2="3" stroke="#f59e0b" stroke-width="2"/></svg>
-        Prognose
+        <span id="badge-pred-legend-label">Prognose</span>
       </span>
     </div>
 

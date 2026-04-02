@@ -50,6 +50,23 @@
   padding-bottom: 2px;
 }
 
+.badge-pred-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  user-select: none;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.badge-pred-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .fetch-status {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
@@ -210,18 +227,47 @@
   color: var(--accent);
 }
 
-.badge-toggle-btn {
-  font-size: 11px;
-  padding: 4px 10px;
-  color: var(--muted);
-  user-select: none;
-  white-space: nowrap;
-}
 .badge-pct-sub {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.62rem;
   color: var(--muted);
   margin-top: 1px;
+}
+
+.badge-model-notes {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.badge-model-notes h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+.badge-model-notes p {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+}
+
+.badge-model-notes ul {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.badge-model-notes a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ── Badge footer (datestamp + QR) ──────────────────────── */
@@ -267,6 +313,7 @@ body.badge-embed-mode .page {
 
 body.badge-embed-mode .page-header,
 body.badge-embed-mode .badge-controls,
+body.badge-embed-mode .badge-model-notes,
 body.badge-embed-mode .page-footer,
 body.badge-embed-mode .badge-footer {
   display: none;
