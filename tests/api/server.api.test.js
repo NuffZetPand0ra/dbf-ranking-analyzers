@@ -67,16 +67,13 @@ describe('API server', () => {
     assert.strictEqual(refreshed.body.cacheSource, 'upstream');
   });
 
-  it('returns 400 on /api/turns with invalid body shape', async () => {
+  it('returns 400 on /api/turns with no ids', async () => {
     const server = createTestServer();
 
-    const res = await request(server)
-      .post('/api/turns')
-      .set('Content-Type', 'application/json')
-      .send({ ids: [] });
+    const res = await request(server).get('/api/turns');
 
     assert.strictEqual(res.status, 400);
-    assert.strictEqual(res.body.error, 'Missing ids array in body');
+    assert.strictEqual(res.body.error, 'Missing ids query param');
   });
 
   it('returns 400 on clear turns endpoint without turnId or all=true', async () => {
@@ -105,10 +102,7 @@ describe('API server', () => {
       .query({ TurnID: '54321' })
       .reply(502, 'upstream error');
 
-    const res = await request(server)
-      .post('/api/turns')
-      .set('Content-Type', 'application/json')
-      .send({ ids: ['12345', '54321'] });
+    const res = await request(server).get('/api/turns?ids=12345,54321');
 
     assert.strictEqual(res.status, 200);
     assert.strictEqual(Array.isArray(res.body.results), true);

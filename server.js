@@ -559,15 +559,11 @@ function createServer(options = {}) {
   const server = http.createServer(async (req, res) => {
     const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-    if (reqUrl.pathname === '/api/turns' && req.method === 'POST') {
-      const body = await readJsonBody(req, res);
-      if (!body) {
-        return;
-      }
-      const rawIds = Array.isArray(body.ids) ? body.ids : [];
+    if (reqUrl.pathname === '/api/turns' && req.method === 'GET') {
+      const rawIds = (reqUrl.searchParams.get('ids') || '').split(',');
       const turnIds = [...new Set(rawIds.map(s => String(s).replace(/\D/g, '')).filter(Boolean))];
       if (!turnIds.length) {
-        sendJson(res, 400, { error: 'Missing ids array in body' });
+        sendJson(res, 400, { error: 'Missing ids query param' });
         return;
       }
 

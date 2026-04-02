@@ -242,12 +242,7 @@ async function fetchTurnDataBatch(turnIds, signal, onProgress) {
       const idx = nextChunk++;
       const chunk = chunks[idx];
 
-      const res = await fetch('/api/turns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: chunk }),
-        signal,
-      });
+      const res = await fetch('/api/turns?ids=' + chunk.join(','), { signal });
 
       if (!res.ok) throw new Error('HTTP ' + res.status);
 
@@ -451,6 +446,7 @@ function showAutocomplete(matches) {
     const item = document.createElement('div');
     item.className = 'autocomplete-item';
     item.dataset.dbf = player.dbfNr;
+    item.dataset.name = player.name;
     const nameDiv = document.createElement('div');
     nameDiv.className = 'autocomplete-item-name';
     nameDiv.textContent = player.name;
@@ -1060,6 +1056,7 @@ async function loadPlayer(dbfNr, options = {}) {
       writeCache(LOOKUP_CACHE_PREFIX, normalizedDbfNr, raw);
     }
     if (requestSeq !== loadRequestSeq) return;
+    searchEl.value = data.name;
 
     let club = '';
     try {
@@ -1115,7 +1112,7 @@ searchEl.addEventListener('blur', hideAutocomplete);
 dropdownEl.addEventListener('click', e => {
   const item = e.target.closest('.autocomplete-item');
   if (!item) return;
-  searchEl.value = '';
+  searchEl.value = item.dataset.name || '';
   hideAutocomplete();
   loadPlayer(item.dataset.dbf);
 });
@@ -1139,7 +1136,7 @@ searchEl.addEventListener('keydown', e => {
     e.preventDefault();
     if (isOpen && autocompleteIndex >= 0) {
       const selected = items[autocompleteIndex];
-      searchEl.value = '';
+      searchEl.value = selected.dataset.name || '';
       hideAutocomplete();
       loadPlayer(selected.dataset.dbf);
     }
