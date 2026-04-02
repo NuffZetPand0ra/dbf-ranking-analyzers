@@ -383,6 +383,7 @@ async function analyzePlayer(player, signal, onProgress) {
 
   // Map turnId -> { partners[], location, title }
   const turnInfo = new Map();
+  const unresolvedReasonByTurnId = new Map();
   let resolvedTurns = 0;
   let unresolvedTurns = 0;
 
@@ -390,6 +391,12 @@ async function analyzePlayer(player, signal, onProgress) {
     const turn = turnResultsMap.get(turnId) || null;
     if (!turn || !turn.groups.length) {
       unresolvedTurns++;
+      unresolvedReasonByTurnId.set(
+        turnId,
+        turn
+          ? (turn.formatHint === 'unknown' ? 'Ukendt turneringsformat eller manglende spillerplacering' : 'Mangler spillergrupper i turneringsdata')
+          : 'Kunne ikke hente turneringsdata'
+      );
       if (turn) {
         turnInfo.set(turnId, { partners: [], location: turn.organizer || '', title: turn.title });
       }
@@ -423,6 +430,7 @@ async function analyzePlayer(player, signal, onProgress) {
       turnInfo.set(turnId, { partners: [...new Set(linkedPlayers)], location, title: turn.title });
     } else {
       unresolvedTurns++;
+      unresolvedReasonByTurnId.set(turnId, 'Ingen makkerrelation fundet for spilleren');
       turnInfo.set(turnId, { partners: [], location, title: turn.title });
     }
   }
@@ -444,6 +452,7 @@ async function analyzePlayer(player, signal, onProgress) {
   const partnerLocationMap = new Map();   // partnerName -> Map<location, count>
   const locationPartnerMap = new Map();   // location -> Map<partnerName, count>
   const partnerEventsMap = new Map();     // partnerName -> [{ date, dateIso, location, tournament, change, hc, turnId }]
+  const unresolvedRows = [];
 
   const processedTurnIds = new Set();
 
@@ -454,9 +463,30 @@ async function analyzePlayer(player, signal, onProgress) {
 
     const info = entry.turnId ? turnInfo.get(entry.turnId) : null;
     const location = entry.sourceLabel || entry.club || info?.location || '';
+    const tournamentTitle = info?.title || entry.tournament || '';
 
     if (location) {
       locationTotalMap.set(location, (locationTotalMap.get(location) || 0) + 1);
+    }
+
+    if (!entry.turnId) {
+      unresolvedRows.push({
+        date: entry.date,
+        dateIso: entry.dateIso,
+        tournament: tournamentTitle,
+        location,
+        reason: 'Mangler TurnID i handicaphistorik',
+        turnId: null,
+      });
+    } else if (!info || !info.partners?.length) {
+      unresolvedRows.push({
+        date: entry.date,
+        dateIso: entry.dateIso,
+        tournament: tournamentTitle,
+        location,
+        reason: unresolvedReasonByTurnId.get(entry.turnId) || 'Makkerrelation kunne ikke udledes',
+        turnId: entry.turnId,
+      });
     }
 
     if (info?.partners?.length) {
@@ -496,6 +526,7 @@ async function analyzePlayer(player, signal, onProgress) {
 
   const partnerTotals = [...partnerTotalMap.entries()].map(([name, count]) => ({ name, count })).sort(sortByCount);
   const locationTotals = [...locationTotalMap.entries()].map(([name, count]) => ({ name, count })).sort(sortByCount);
+  unresolvedRows.sort((a, b) => b.date - a.date || a.tournament.localeCompare(b.tournament, 'da'));
 
   return {
     partnerTotals,
@@ -503,6 +534,7 @@ async function analyzePlayer(player, signal, onProgress) {
     partnerLocationMap,
     locationPartnerMap,
     partnerEventsMap,
+    unresolvedRows,
     resolvedTurns,
     unresolvedTurns,
     totalEntries: processedTurnIds.size,
@@ -697,6 +729,57 @@ function fillPartnerTree(tableId, partners, eventsMap) {
   }
 }
 
+function fillUnresolvedTable(tableId, rows) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML = '';
+
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 5;
+    td.className = 'wp-table-empty';
+    td.textContent = 'Ingen uafklarede turneringer';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.textContent = row.date ? fmtDateShort(row.date) : '';
+
+    const tdTournament = document.createElement('td');
+    tdTournament.textContent = row.tournament || '';
+
+    const tdLocation = document.createElement('td');
+    tdLocation.textContent = row.location || '';
+
+    const tdReason = document.createElement('td');
+    tdReason.textContent = row.reason || '';
+
+    const tdLink = document.createElement('td');
+    if (row.turnId) {
+      const link = document.createElement('a');
+      link.className = 'wp-tree-link';
+      link.href = 'https://medlemmer.bridge.dk/LookUpTURN.php?TurnID=' + encodeURIComponent(row.turnId);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'DBf';
+      link.title = 'Åbn turnering på bridge.dk';
+      tdLink.appendChild(link);
+    } else {
+      tdLink.textContent = '–';
+      tdLink.className = 'wp-table-dim';
+    }
+
+    tr.append(tdDate, tdTournament, tdLocation, tdReason, tdLink);
+    tbody.appendChild(tr);
+  }
+}
+
 function populateSelect(selectEl, items, placeholder) {
   selectEl.innerHTML = '';
   const opt = document.createElement('option');
@@ -719,6 +802,7 @@ const panels = {
   locations: document.getElementById('wp-panel-locations'),
   'location-detail': document.getElementById('wp-panel-location-detail'),
   'partner-detail': document.getElementById('wp-panel-partner-detail'),
+  unresolved: document.getElementById('wp-panel-unresolved'),
 };
 
 function switchTab(tabName) {
@@ -765,6 +849,7 @@ function render() {
 
   fillPartnerTree('wp-table-partners', r.partnerTotals, r.partnerEventsMap);
   fillTable('wp-table-locations', r.locationTotals, 'Lokation', 'Turneringer');
+  fillUnresolvedTable('wp-table-unresolved', r.unresolvedRows || []);
 
   populateSelect(locationSelectEl, r.locationTotals, 'Vælg lokation...');
   populateSelect(partnerSelectEl, r.partnerTotals, 'Vælg makker...');
