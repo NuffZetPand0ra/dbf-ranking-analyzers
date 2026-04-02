@@ -3,7 +3,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 const { URL } = require('url');
-const { createTournamentCacheStore } = require('./tournament-cache-store');
+const { createTournamentCacheStore } = require('./cache/tournament-cache-store');
 
 const HACALLE_URL = 'https://medlemmer.bridge.dk/HACAlle.php';
 const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
