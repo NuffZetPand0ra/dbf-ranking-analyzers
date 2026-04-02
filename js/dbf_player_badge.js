@@ -16,7 +16,6 @@ let allPlayersData   = null;   // players[] from /api/hacalle
 let chart            = null;
 let autocompleteIndex = -1;
 let isRestoringState = false;
-let showHover       = true;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const searchEl      = document.getElementById('badge-search');
@@ -30,7 +29,6 @@ const predMonthsEl  = document.getElementById('badge-pred-months');
 const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
 const optValEl      = document.getElementById('badge-opt-val');
-const hoverBtnEl    = document.getElementById('badge-toggle-hover');
 const embedUrlBtnEl = document.getElementById('badge-embed-url-btn');
 const embedBtnEl    = document.getElementById('badge-embed-btn');
 const shareBtnEl    = document.getElementById('badge-share-btn');
@@ -520,14 +518,6 @@ function clubPercentile(hc, club, allPlayers) {
   return Math.round((worse / clubPlayers.length) * 100);
 }
 
-function applyHoverState() {
-  if (hoverBtnEl) hoverBtnEl.classList.toggle('on', showHover);
-  if (!chart) return;
-
-  chart.options.plugins.tooltip.enabled = showHover;
-  chart.update('none');
-}
-
 function applyPageMode() {
   document.body.classList.toggle('badge-embed-mode', isEmbedMode);
   if (isEmbedMode) {
@@ -727,7 +717,7 @@ function render() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          enabled: showHover,
+          enabled: false,
           callbacks: {
             title: items => fmtDate(new Date(items[0].parsed.x)),
             label: ctx => {
@@ -855,7 +845,6 @@ function buildStateParams({ includeEmbed = isEmbedMode } = {}) {
   if (rw && rw !== 12) p.set('rw', String(rw));
   const opt = parseFloat(optimismEl.value);
   if (opt !== 0) p.set('opt', String(opt));
-  if (!showHover) p.set('hover', '0');
 
   return p;
 }
@@ -892,8 +881,6 @@ async function restoreStateFromUrl() {
       optimismEl.value = opt;
       optValEl.textContent = parseFloat(opt).toFixed(1);
     }
-    showHover = params.get('hover') !== '0';
-    if (hoverBtnEl) hoverBtnEl.classList.toggle('on', showHover);
     applyPredictionControlState();
 
     const dbfNr = params.get('p');
@@ -1017,14 +1004,6 @@ optimismEl.addEventListener('input', () => {
   optValEl.textContent = parseFloat(optimismEl.value).toFixed(1);
   render();
 });
-
-if (hoverBtnEl) {
-  hoverBtnEl.addEventListener('click', () => {
-    showHover = !showHover;
-    applyHoverState();
-    syncUrl();
-  });
-}
 
 if (embedBtnEl) {
   embedBtnEl.addEventListener('click', copyEmbedCode);
