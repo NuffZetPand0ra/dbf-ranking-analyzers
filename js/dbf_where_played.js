@@ -33,6 +33,13 @@ const partnerSelectEl = document.getElementById('wp-partner-select');
 const turnDataMemo = new Map();
 const TURN_BATCH_SIZE = 75;
 const TURN_BATCH_CONCURRENCY = 3;
+const ETA_RECALC_INTERVAL_MS = 20 * 1000;
+const ETA_TICK_MS = 1000;
+
+let etaTicker = null;
+let etaTargetAtMs = null;
+let etaNextRecalcAtMs = 0;
+let latestLoadProgress = null;
 
 /* ── Helpers ── */
 
@@ -305,22 +312,65 @@ function setLoadStatus(msg, cls, showCancel) {
   }
 }
 
-function formatDurationCompact(seconds) {
+function formatDurationHms(seconds) {
   const total = Math.max(0, Math.round(seconds || 0));
-  const mins = Math.floor(total / 60);
-  const secs = total % 60;
-  if (!mins) return `${secs}s`;
-  return `${mins}m ${String(secs).padStart(2, '0')}s`;
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function formatClockHms(timestampMs) {
+  if (!timestampMs) return '';
+  const d = new Date(timestampMs);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function stopEtaTicker() {
+  if (etaTicker) {
+    clearInterval(etaTicker);
+    etaTicker = null;
+  }
+}
+
+function renderProgressMeta() {
+  if (!progressMetaEl || !latestLoadProgress) return;
+  const progress = latestLoadProgress;
+
+  const failText = progress.failed ? ` · fejl ${progress.failed}` : '';
+  let etaText = '';
+
+  if (etaTargetAtMs && progress.done < progress.total) {
+    const remainingSeconds = Math.max(0, Math.ceil((etaTargetAtMs - Date.now()) / 1000));
+    etaText = ` · est. færdig ${formatClockHms(etaTargetAtMs)} · tilbage ${formatDurationHms(remainingSeconds)}`;
+  }
+
+  progressMetaEl.textContent = `${progress.done}/${progress.total} · cache ${progress.cached} · hentet ${progress.fetched}${failText}${etaText}`;
 }
 
 function setLoadProgress(progress) {
   if (!progressWrapEl || !progressBarEl || !progressMetaEl) return;
   if (!progress || !progress.total) {
+    latestLoadProgress = null;
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
     progressWrapEl.style.display = 'none';
     progressBarEl.style.width = '0%';
     progressMetaEl.textContent = '';
     return;
   }
+
+  latestLoadProgress = {
+    total: progress.total,
+    done: progress.done,
+    cached: progress.cached,
+    fetched: progress.fetched,
+    failed: progress.failed,
+  };
 
   progressWrapEl.style.display = '';
   const pct = Math.max(0, Math.min(100, (progress.done / progress.total) * 100));
@@ -328,9 +378,30 @@ function setLoadProgress(progress) {
   if (track) track.setAttribute('aria-valuenow', String(Math.round(pct)));
   progressBarEl.style.width = `${pct}%`;
 
-  const etaText = progress.etaSeconds && progress.done < progress.total ? ` · ETA ~${formatDurationCompact(progress.etaSeconds)}` : '';
-  const failText = progress.failed ? ` · fejl ${progress.failed}` : '';
-  progressMetaEl.textContent = `${progress.done}/${progress.total} · cache ${progress.cached} · hentet ${progress.fetched}${failText}${etaText}`;
+  const now = Date.now();
+  if (progress.etaSeconds && progress.done < progress.total) {
+    if (!etaTargetAtMs || now >= etaNextRecalcAtMs) {
+      etaTargetAtMs = now + progress.etaSeconds * 1000;
+      etaNextRecalcAtMs = now + ETA_RECALC_INTERVAL_MS;
+    }
+    if (!etaTicker) {
+      etaTicker = setInterval(() => {
+        if (!latestLoadProgress || latestLoadProgress.done >= latestLoadProgress.total) {
+          stopEtaTicker();
+          return;
+        }
+        renderProgressMeta();
+      }, ETA_TICK_MS);
+    }
+  }
+
+  if (progress.done >= progress.total) {
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
+  }
+
+  renderProgressMeta();
 }
 
 /* ── Autocomplete ── */
@@ -935,8 +1006,7 @@ async function loadPlayer(dbfNr) {
     const onProgress = progress => {
       if (requestSeq !== loadRequestSeq) return;
       setLoadProgress(progress);
-      const etaText = progress.etaSeconds && progress.done < progress.total ? ` · ETA ~${formatDurationCompact(progress.etaSeconds)}` : '';
-      setLoadStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}${etaText}`, '', true);
+      setLoadStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}`, '', true);
     };
 
     const result = await analyzePlayer(currentPlayer, loadController.signal, onProgress);
