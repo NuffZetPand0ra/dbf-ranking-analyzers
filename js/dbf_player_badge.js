@@ -24,6 +24,8 @@ const dropdownEl    = document.getElementById('badge-dropdown');
 const statusEl      = document.getElementById('badge-status');
 const fromEl        = document.getElementById('badge-from');
 const toEl          = document.getElementById('badge-to');
+const predEnabledEl = document.getElementById('badge-pred-enabled');
+const predTypeEl    = document.getElementById('badge-pred-type');
 const predMonthsEl  = document.getElementById('badge-pred-months');
 const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
@@ -36,6 +38,8 @@ const exportBtnEl   = document.getElementById('badge-export-btn');
 const emptyEl       = document.getElementById('badge-empty');
 const wrapEl        = document.getElementById('badge-wrap');
 const badgeChartEl  = document.getElementById('badge-chart');
+const predLegendLineEl = document.getElementById('badge-pred-legend-line-pred');
+const predLegendLabelEl = document.getElementById('badge-pred-legend-label');
 const statsEl       = document.getElementById('badge-stats');
 const pctEl         = document.getElementById('badge-percentile');
 
@@ -295,6 +299,111 @@ function linearRegression(points) {
   return { slope, intercept };
 }
 
+// Weighted least squares linear regression.
+// points: [{x:number, y:number}], weights: number[] (same length)
+function weightedLinearRegression(points, weights) {
+  const n = points.length;
+  if (n < 2 || !Array.isArray(weights) || weights.length !== n) {
+    return linearRegression(points);
+  }
+
+  let sumW = 0, sumWX = 0, sumWY = 0, sumWXY = 0, sumWXX = 0;
+  for (let i = 0; i < n; i++) {
+    const p = points[i];
+    const w = Number.isFinite(weights[i]) && weights[i] > 0 ? weights[i] : 0;
+    if (!w) continue;
+    sumW   += w;
+    sumWX  += w * p.x;
+    sumWY  += w * p.y;
+    sumWXY += w * p.x * p.y;
+    sumWXX += w * p.x * p.x;
+  }
+
+  if (sumW <= 0) return linearRegression(points);
+  const denom = sumW * sumWXX - sumWX * sumWX;
+  if (Math.abs(denom) < 1e-10) return { slope: 0, intercept: sumWY / sumW };
+
+  const slope = (sumW * sumWXY - sumWX * sumWY) / denom;
+  const intercept = (sumWY - slope * sumWX) / sumW;
+  return { slope, intercept };
+}
+
+function clampSlopePerDay(slope, maxAbsMonthlyDelta = 0.7) {
+  const maxAbsPerDay = maxAbsMonthlyDelta / 30.4375;
+  return Math.max(-maxAbsPerDay, Math.min(maxAbsPerDay, slope));
+}
+
+function getPredictionType() {
+  const t = predTypeEl?.value;
+  if (t === 'linear' || t === 'holt') return t;
+  return 'weighted';
+}
+
+function isPredictionEnabled() {
+  return !predEnabledEl || predEnabledEl.checked;
+}
+
+function applyPredictionControlState() {
+  const enabled = isPredictionEnabled();
+  [predTypeEl, predMonthsEl, regMonthsEl, optimismEl].forEach(el => {
+    if (el) el.disabled = !enabled;
+  });
+  if (optValEl) optValEl.style.opacity = enabled ? '1' : '0.45';
+  if (predLegendLineEl) predLegendLineEl.style.display = enabled ? '' : 'none';
+}
+
+function predictionTypeLabel(type) {
+  if (type === 'linear') return 'Prognose (lineær)';
+  if (type === 'holt') return 'Prognose (Holt trend)';
+  return 'Prognose (vægtet lineær)';
+}
+
+function buildRecencyWeights(entries, anchorDate, halfLifeDays = 35) {
+  const lambda = Math.log(2) / Math.max(1, halfLifeDays);
+  return entries.map(e => {
+    const ageDays = Math.max(0, (anchorDate - e.date) / 86400000);
+    const w = Math.exp(-lambda * ageDays);
+    // Square the decay for clearer separation vs plain linear regression.
+    return w * w;
+  });
+}
+
+// Holt linear trend (double exponential smoothing) over irregular dates.
+// Returns trend in hc/day so it can reuse the existing projection pipeline.
+function holtTrendPerDay(entries, alpha = 0.45, beta = 0.2) {
+  if (!Array.isArray(entries) || entries.length < 2) return 0;
+
+  const dayMap = new Map();
+  for (const e of entries) {
+    const key = toIso(e.date);
+    dayMap.set(key, e.hc); // last value of the day wins
+  }
+  const compact = [...dayMap.entries()]
+    .map(([iso, hc]) => ({ date: new Date(iso + 'T12:00:00'), hc }))
+    .sort((a, b) => a.date - b.date);
+
+  if (compact.length < 2) return 0;
+
+  let level = compact[0].hc;
+  const initDays = Math.max(1, (compact[1].date - compact[0].date) / 86400000);
+  let trend = (compact[1].hc - compact[0].hc) / initDays;
+
+  for (let i = 1; i < compact.length; i++) {
+    const prev = compact[i - 1];
+    const cur = compact[i];
+    const dt = Math.max(1, (cur.date - prev.date) / 86400000);
+
+    const predicted = level + trend * dt;
+    const newLevel = alpha * cur.hc + (1 - alpha) * predicted;
+    const newTrend = beta * ((newLevel - level) / dt) + (1 - beta) * trend;
+
+    level = newLevel;
+    trend = newTrend;
+  }
+
+  return Number.isFinite(trend) ? clampSlopePerDay(trend, 0.55) : 0;
+}
+
 // ── Optimism / prediction ─────────────────────────────────────────────────────
 // Maps slider [-2..+2] to a multiplier:
 //   opt=0  → factor 1 (exact regression slope)
@@ -416,9 +525,6 @@ function applyHoverState() {
   if (!chart) return;
 
   chart.options.plugins.tooltip.enabled = showHover;
-  chart.data.datasets.forEach(dataset => {
-    dataset.pointHoverRadius = showHover ? 5 : 0;
-  });
   chart.update('none');
 }
 
@@ -494,6 +600,8 @@ function render() {
   }
 
   const from       = getFrom();
+  const predEnabled = isPredictionEnabled();
+  const predType   = getPredictionType();
   const predMonths = Math.max(0, parseInt(predMonthsEl.value, 10) || 12);
   const opt        = parseFloat(optimismEl.value) || 0;
 
@@ -531,10 +639,24 @@ function render() {
     e => e.date >= regWindowStart && e.date <= anchorDate
   );
   let rawSlope = 0;
-  if (regEntries.length >= 2) {
+  if (predEnabled && regEntries.length >= 2) {
     const x0  = regEntries[0].date / 86400000;
     const pts = regEntries.map(e => ({ x: e.date / 86400000 - x0, y: e.hc }));
-    rawSlope = linearRegression(pts).slope;
+    if (predType === 'linear') {
+      rawSlope = linearRegression(pts).slope;
+    } else if (predType === 'holt') {
+      const holtSlope = holtTrendPerDay(regEntries);
+      const baselineSlope = weightedLinearRegression(
+        pts,
+        buildRecencyWeights(regEntries, anchorDate)
+      ).slope;
+      // Blend with weighted baseline so Holt keeps momentum without blowing up.
+      rawSlope = 0.65 * holtSlope + 0.35 * baselineSlope;
+    } else {
+      const weights = buildRecencyWeights(regEntries, anchorDate);
+      rawSlope = weightedLinearRegression(pts, weights).slope;
+    }
+    rawSlope = clampSlopePerDay(rawSlope);
   }
 
   // HC at anchor: last actual entry on or before the anchor date
@@ -543,9 +665,13 @@ function render() {
     ? beforeAnchor[beforeAnchor.length - 1].hc
     : (hasData ? filteredEntries[0].hc : currentHc);
 
-  const predEntries = generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths);
+  const predEntries = predEnabled
+    ? generatePrediction(anchorDate, anchorHc, rawSlope, opt, predMonths)
+    : [];
   // Prediction starts at the anchor date; both lines are fully independent
-  const predWithAnchor = [{ date: anchorDate, hc: anchorHc }, ...predEntries];
+  const predWithAnchor = predEnabled
+    ? [{ date: anchorDate, hc: anchorHc }, ...predEntries]
+    : [];
 
   // Resolve CSS variables for Chart.js (canvas can't use var(--x) strings)
   const rootStyle  = getComputedStyle(document.documentElement);
@@ -557,7 +683,9 @@ function render() {
   // so dense actual data and sparse monthly prediction coexist cleanly.
   // x-axis bounds are set explicitly so the chart fills its full width.
   const xMin = hasData ? filteredEntries[0].date.getTime() : anchorDate.getTime();
-  const xMax = predWithAnchor[predWithAnchor.length - 1].date.getTime();
+  const xMax = predWithAnchor.length
+    ? predWithAnchor[predWithAnchor.length - 1].date.getTime()
+    : (hasData ? filteredEntries[filteredEntries.length - 1].date.getTime() : anchorDate.getTime());
 
   const actualDataset = {
     label: 'Faktisk HC',
@@ -565,30 +693,33 @@ function render() {
     borderColor: BADGE_COLOR,
     backgroundColor: BADGE_COLOR + '22',
     borderWidth: 2.5,
-    pointRadius: filteredEntries.length > 60 ? 0 : 3,
-    pointHoverRadius: showHover ? 5 : 0,
+    pointRadius: 0,
+    pointHoverRadius: 0,
     tension: 0.1,
     fill: false,
   };
 
   const predDataset = {
-    label: 'Prognose',
+    label: predictionTypeLabel(predType),
     data: predWithAnchor.map(e => ({ x: e.date.getTime(), y: e.hc })),
     borderColor: PRED_COLOR,
     backgroundColor: PRED_COLOR + '22',
     borderWidth: 2,
-    pointRadius: 3,
-    pointHoverRadius: showHover ? 5 : 0,
+    pointRadius: 0,
+    pointHoverRadius: 0,
     tension: 0,
     fill: false,
   };
+
+  if (predLegendLabelEl) predLegendLabelEl.textContent = predictionTypeLabel(predType);
+  applyPredictionControlState();
 
   // ── Update or create chart ───────────────────────────────────────────────
   // Always destroy + recreate so scale options (min/max) stay fresh
   if (chart) { chart.destroy(); chart = null; }
   chart = new Chart(badgeChartEl, {
     type: 'line',
-    data: { datasets: [actualDataset, predDataset] },
+    data: { datasets: predEnabled ? [actualDataset, predDataset] : [actualDataset] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -602,7 +733,7 @@ function render() {
             label: ctx => {
               const v = ctx.parsed.y;
               if (v == null) return null;
-              const tag = ctx.datasetIndex === 1 ? 'Prognose' : 'HC';
+              const tag = ctx.dataset.label?.startsWith('Prognose') ? 'Prognose' : 'HC';
               return ` ${tag}: ${v.toFixed(2)}`;
             }
           }
@@ -715,6 +846,9 @@ function buildStateParams({ includeEmbed = isEmbedMode } = {}) {
   if (currentPlayer) p.set('p', currentPlayer.dbfNr);
   if (fromEl.value) p.set('from', fromEl.value);
   if (toEl.value)   p.set('to', toEl.value);
+  if (!isPredictionEnabled()) p.set('pe', '0');
+  const predType = getPredictionType();
+  if (predType !== 'weighted') p.set('pt', predType);
   const pm = parseInt(predMonthsEl.value, 10);
   if (pm && pm !== 12) p.set('pm', String(pm));
   const rw = parseInt(regMonthsEl.value, 10);
@@ -746,6 +880,9 @@ async function restoreStateFromUrl() {
   try {
     if (params.get('from'))  fromEl.value = params.get('from');
     if (params.get('to'))    toEl.value   = params.get('to');
+    if (predEnabledEl) predEnabledEl.checked = params.get('pe') !== '0';
+    const pt = params.get('pt');
+    if (predTypeEl && (pt === 'linear' || pt === 'weighted' || pt === 'holt')) predTypeEl.value = pt;
     const pm = params.get('pm');
     if (pm) predMonthsEl.value = pm;
     const rw = params.get('rw');
@@ -757,6 +894,7 @@ async function restoreStateFromUrl() {
     }
     showHover = params.get('hover') !== '0';
     if (hoverBtnEl) hoverBtnEl.classList.toggle('on', showHover);
+    applyPredictionControlState();
 
     const dbfNr = params.get('p');
     if (dbfNr) {
@@ -870,6 +1008,8 @@ async function exportBadge() {
 // ── Event listeners ───────────────────────────────────────────────────────────
 fromEl.addEventListener('change', render);
 toEl.addEventListener('change', render);
+if (predEnabledEl) predEnabledEl.addEventListener('change', render);
+if (predTypeEl) predTypeEl.addEventListener('change', render);
 predMonthsEl.addEventListener('input', render);
 regMonthsEl.addEventListener('input', render);
 
@@ -912,6 +1052,7 @@ exportBtnEl.addEventListener('click', exportBadge);
 })();
 
 applyPageMode();
+applyPredictionControlState();
 window.addEventListener('resize', notifyEmbedHeight);
 
 restoreStateFromUrl().finally(() => {

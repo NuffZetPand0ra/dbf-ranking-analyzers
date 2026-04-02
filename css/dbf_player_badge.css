@@ -50,6 +50,23 @@
   padding-bottom: 2px;
 }
 
+.badge-pred-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  user-select: none;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.badge-pred-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .fetch-status {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
