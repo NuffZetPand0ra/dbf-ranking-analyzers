@@ -10,11 +10,15 @@ let allPlayersData = null;
 let autocompleteIndex = -1;
 let loadController = null;
 let analysisResult = null;
+let loadRequestSeq = 0;
 
 const searchEl = document.getElementById('wp-search');
 const dropdownEl = document.getElementById('wp-dropdown');
 const statusEl = document.getElementById('wp-status');
 const loadStatusEl = document.getElementById('wp-load-status');
+const progressWrapEl = document.getElementById('wp-progress-wrap');
+const progressBarEl = document.getElementById('wp-progress-bar');
+const progressMetaEl = document.getElementById('wp-progress-meta');
 const emptyEl = document.getElementById('wp-empty');
 const wrapEl = document.getElementById('wp-wrap');
 const playerEl = document.getElementById('wp-player');
@@ -27,6 +31,8 @@ const locationSelectEl = document.getElementById('wp-location-select');
 const partnerSelectEl = document.getElementById('wp-partner-select');
 
 const turnDataMemo = new Map();
+const TURN_BATCH_SIZE = 75;
+const TURN_BATCH_CONCURRENCY = 3;
 
 /* ── Helpers ── */
 
@@ -132,8 +138,8 @@ function writeCache(prefix, key, data) {
 
 /* ── Fetchers ── */
 
-async function fetchLookupData(dbfNr) {
-  const res = await fetch('/api/lookup?dbfNr=' + encodeURIComponent(dbfNr));
+async function fetchLookupData(dbfNr, signal) {
+  const res = await fetch('/api/lookup?dbfNr=' + encodeURIComponent(dbfNr), { signal });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return await res.json();
 }
@@ -146,7 +152,25 @@ function getCachedTurnData(turnId) {
   return undefined; // not cached
 }
 
-async function fetchTurnDataBatch(turnIds, signal) {
+function chunkArray(list, size) {
+  const chunks = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function estimateEtaSeconds(startedAtMs, completedUncached, totalUncached) {
+  if (!startedAtMs || completedUncached <= 0 || totalUncached <= completedUncached) return null;
+  const elapsedSeconds = (Date.now() - startedAtMs) / 1000;
+  if (elapsedSeconds <= 0) return null;
+  const perSecond = completedUncached / elapsedSeconds;
+  if (!Number.isFinite(perSecond) || perSecond <= 0) return null;
+  const remaining = totalUncached - completedUncached;
+  return Math.max(1, Math.ceil(remaining / perSecond));
+}
+
+async function fetchTurnDataBatch(turnIds, signal, onProgress) {
   // Partition into cached and uncached
   const results = new Map();
   const uncachedIds = [];
@@ -156,23 +180,82 @@ async function fetchTurnDataBatch(turnIds, signal) {
     else { uncachedIds.push(id); }
   }
 
-  // Fetch uncached in a single batch request (POST to avoid URI length limits)
-  if (uncachedIds.length) {
-    const res = await fetch('/api/turns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: uncachedIds }),
-      signal,
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    for (const item of json.results) {
-      if (item.error) { results.set(item.turnId, null); continue; }
-      const normalized = normalizeTurnResponse(item);
-      if (normalized) { writeCache(TURN_CACHE_PREFIX, item.turnId, item); turnDataMemo.set(item.turnId, normalized); }
-      results.set(item.turnId, normalized);
+  const progressState = {
+    total: turnIds.length,
+    done: results.size,
+    cached: results.size,
+    fetched: 0,
+    failed: 0,
+    etaSeconds: null,
+  };
+  if (onProgress) onProgress(progressState);
+
+  if (!uncachedIds.length) {
+    return results;
+  }
+
+  const startedAtMs = Date.now();
+  const chunks = chunkArray(uncachedIds, TURN_BATCH_SIZE);
+  let nextChunk = 0;
+
+  async function worker() {
+    while (nextChunk < chunks.length) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      const idx = nextChunk++;
+      const chunk = chunks[idx];
+
+      const res = await fetch('/api/turns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: chunk }),
+        signal,
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const json = await res.json();
+      const responseItems = Array.isArray(json.results) ? json.results : [];
+      const seenIds = new Set();
+
+      for (const item of responseItems) {
+        const turnId = String(item?.turnId ?? '').replace(/\D/g, '');
+        if (!turnId || seenIds.has(turnId)) continue;
+        seenIds.add(turnId);
+
+        if (item.error) {
+          results.set(turnId, null);
+          progressState.failed++;
+          continue;
+        }
+
+        const normalized = normalizeTurnResponse(item);
+        if (normalized) {
+          writeCache(TURN_CACHE_PREFIX, turnId, item);
+          turnDataMemo.set(turnId, normalized);
+          results.set(turnId, normalized);
+        } else {
+          results.set(turnId, null);
+          progressState.failed++;
+        }
+      }
+
+      for (const requestedId of chunk) {
+        if (seenIds.has(requestedId)) continue;
+        if (!results.has(requestedId)) {
+          results.set(requestedId, null);
+          progressState.failed++;
+        }
+      }
+
+      progressState.fetched += chunk.length;
+      progressState.done = progressState.cached + progressState.fetched;
+      progressState.etaSeconds = estimateEtaSeconds(startedAtMs, progressState.fetched, uncachedIds.length);
+      if (onProgress) onProgress(progressState);
     }
   }
+
+  const workers = Array.from({ length: Math.min(TURN_BATCH_CONCURRENCY, chunks.length) }, () => worker());
+  await Promise.all(workers);
 
   return results;
 }
@@ -222,6 +305,34 @@ function setLoadStatus(msg, cls, showCancel) {
   }
 }
 
+function formatDurationCompact(seconds) {
+  const total = Math.max(0, Math.round(seconds || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (!mins) return `${secs}s`;
+  return `${mins}m ${String(secs).padStart(2, '0')}s`;
+}
+
+function setLoadProgress(progress) {
+  if (!progressWrapEl || !progressBarEl || !progressMetaEl) return;
+  if (!progress || !progress.total) {
+    progressWrapEl.style.display = 'none';
+    progressBarEl.style.width = '0%';
+    progressMetaEl.textContent = '';
+    return;
+  }
+
+  progressWrapEl.style.display = '';
+  const pct = Math.max(0, Math.min(100, (progress.done / progress.total) * 100));
+  const track = progressBarEl.parentElement;
+  if (track) track.setAttribute('aria-valuenow', String(Math.round(pct)));
+  progressBarEl.style.width = `${pct}%`;
+
+  const etaText = progress.etaSeconds && progress.done < progress.total ? ` · ETA ~${formatDurationCompact(progress.etaSeconds)}` : '';
+  const failText = progress.failed ? ` · fejl ${progress.failed}` : '';
+  progressMetaEl.textContent = `${progress.done}/${progress.total} · cache ${progress.cached} · hentet ${progress.fetched}${failText}${etaText}`;
+}
+
 /* ── Autocomplete ── */
 
 function playerMatchesQuery(player, query) {
@@ -263,12 +374,12 @@ async function handleSearchInput() {
 
 /* ── Core analysis ── */
 
-async function analyzePlayer(player, signal) {
+async function analyzePlayer(player, signal, onProgress) {
   const entries = player.entries.filter(e => e.turnId);
   const turnIds = [...new Set(entries.map(e => e.turnId))];
   const playerKey = normalizeName(player.name);
 
-  const turnResultsMap = await fetchTurnDataBatch(turnIds, signal);
+  const turnResultsMap = await fetchTurnDataBatch(turnIds, signal, onProgress);
 
   // Map turnId -> { partners[], location, title }
   const turnInfo = new Map();
@@ -697,8 +808,10 @@ partnerSelectEl.addEventListener('change', () => {
 
 async function loadPlayer(dbfNr) {
   if (!dbfNr) return;
+  const requestSeq = ++loadRequestSeq;
   setStatus('Henter...', '');
   setLoadStatus('', '');
+  setLoadProgress(null);
   analysisResult = null;
   currentPlayer = null;
   render(); // clear previous results immediately
@@ -707,16 +820,18 @@ async function loadPlayer(dbfNr) {
   loadController = new AbortController();
 
   try {
+    setLoadStatus('Henter spillerhistorik...', '', true);
     const normalizedDbfNr = String(dbfNr).replace(/\D/g, '');
 
     // Fetch player lookup data
     let data = readCache(LOOKUP_CACHE_PREFIX, normalizedDbfNr, LOOKUP_CACHE_MAX_AGE_MS, normalizeLookupResponse);
     if (!data) {
-      const raw = await fetchLookupData(normalizedDbfNr);
+      const raw = await fetchLookupData(normalizedDbfNr, loadController.signal);
       data = normalizeLookupResponse(raw);
       if (!data) throw new Error('Kunne ikke fortolke spillerhistorik');
       writeCache(LOOKUP_CACHE_PREFIX, normalizedDbfNr, raw);
     }
+    if (requestSeq !== loadRequestSeq) return;
 
     let club = '';
     try {
@@ -724,6 +839,7 @@ async function loadPlayer(dbfNr) {
       const match = allPlayers.find(p => p.dbfNr === normalizedDbfNr);
       if (match) club = match.club || '';
     } catch {}
+    if (requestSeq !== loadRequestSeq) return;
 
     currentPlayer = { ...data, dbfNr: normalizedDbfNr, club };
 
@@ -731,7 +847,16 @@ async function loadPlayer(dbfNr) {
     setStatus('Indlæst: ' + data.name, 'ok');
     setLoadStatus(`Henter detaljer om ${turnCount} turneringer for ${data.name}`, '', true);
 
-    const result = await analyzePlayer(currentPlayer, loadController.signal);
+    const onProgress = progress => {
+      if (requestSeq !== loadRequestSeq) return;
+      setLoadProgress(progress);
+      const etaText = progress.etaSeconds && progress.done < progress.total ? ` · ETA ~${formatDurationCompact(progress.etaSeconds)}` : '';
+      setLoadStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}${etaText}`, '', true);
+    };
+
+    const result = await analyzePlayer(currentPlayer, loadController.signal, onProgress);
+    if (requestSeq !== loadRequestSeq) return;
+
     analysisResult = result;
 
     setLoadStatus(
@@ -743,11 +868,13 @@ async function loadPlayer(dbfNr) {
   } catch (err) {
     if (err.name === 'AbortError') {
       setLoadStatus('Annulleret', 'err');
+      setLoadProgress(null);
     } else {
       setStatus('Fejl: ' + err.message, 'err');
+      setLoadProgress(null);
     }
   } finally {
-    loadController = null;
+    if (requestSeq === loadRequestSeq) loadController = null;
   }
 }
 
