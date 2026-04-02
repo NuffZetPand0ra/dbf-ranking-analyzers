@@ -115,4 +115,44 @@ describe('SQLite tournament cache behavior', () => {
 
     assert.strictEqual(fs.existsSync(dbPath), true);
   });
+
+  it('clears persisted tournament cache rows via dedicated endpoint', async () => {
+    const fixture = readFixtureBuffer('turn_pair.html');
+    const fetchState = makeFetchReturningFixture(fixture);
+    const server = createServer({
+      fetchImpl: fetchState.fetchImpl,
+      env: {
+        CACHE_DB_PATH: dbPath,
+        TURN_CACHE_PARSER_VERSION: 'turn-v1',
+        HOST: '127.0.0.1',
+      }
+    });
+
+    const first = await request(server).get('/api/turn?turnId=33333');
+    assert.strictEqual(first.status, 200);
+    assert.strictEqual(first.body.cache, 'MISS');
+    assert.strictEqual(fetchState.getCalls(), 1);
+
+    const cleared = await request(server)
+      .post('/api/cache/clear/turns')
+      .set('Content-Type', 'application/json')
+      .send({ turnId: '33333' });
+
+    assert.strictEqual(cleared.status, 200);
+    assert.strictEqual(cleared.body.cacheType, 'turns');
+    assert.strictEqual(cleared.body.turnId, '33333');
+    assert.strictEqual(cleared.body.memoryCleared, 1);
+    assert.strictEqual(cleared.body.persistentCleared, 1);
+
+    const statusAfterClear = await request(server).get('/api/cache-status');
+    assert.strictEqual(statusAfterClear.status, 200);
+    assert.strictEqual(statusAfterClear.body.sqliteCache.stats.totalRows, 0);
+
+    const second = await request(server).get('/api/turn?turnId=33333');
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.cache, 'MISS');
+    assert.strictEqual(fetchState.getCalls(), 2);
+
+    server.close();
+  });
 });

@@ -9,6 +9,8 @@ function createDisabledStore(reason = 'disabled for test') {
     parserVersion: null,
     get: () => null,
     upsert: () => null,
+    deleteTurn: () => 0,
+    clearAll: () => 0,
     deleteExpiredMutable: () => 0,
     deleteRowsForOtherParserVersions: () => 0,
     stats: () => null,
