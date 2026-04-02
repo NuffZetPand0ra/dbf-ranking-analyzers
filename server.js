@@ -3,6 +3,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 const { URL } = require('url');
+const { createTournamentCacheStore } = require('./tournament-cache-store');
 
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -15,11 +16,23 @@ const LOOKUP_BASE_URL = 'https://medlemmer.bridge.dk/LookUpHAC.php';
 const TURN_BASE_URL = 'https://medlemmer.bridge.dk/LookUpTURN.php';
 const HACALLE_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const LOOKUP_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const TURN_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const TURN_MEMORY_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const TURN_MUTABLE_TTL_HOURS = Number(process.env.TURN_MUTABLE_TTL_HOURS || 12);
+const TOURNAMENT_IMMUTABLE_DAYS = Number(process.env.TOURNAMENT_IMMUTABLE_DAYS || 60);
+const TURN_CACHE_PARSER_VERSION = String(process.env.TURN_CACHE_PARSER_VERSION || 'turn-v1');
+const PURGE_OLD_PARSER_VERSIONS_ON_START = process.env.TURN_CACHE_PURGE_OLD_VERSIONS_ON_START === '1';
+const CACHE_DB_PATH = process.env.CACHE_DB_PATH || path.join(ROOT, '.cache', 'tournament-cache.sqlite');
+const TURN_SQLITE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 
 let hacalleCache = null;
 const lookupCache = new Map(); // dbfNr -> { ts, data }
 const turnCache = new Map(); // turnId -> { ts, data }
+const tournamentCacheStore = createTournamentCacheStore({
+  dbPath: CACHE_DB_PATH,
+  immutableDays: TOURNAMENT_IMMUTABLE_DAYS,
+  mutableTtlHours: TURN_MUTABLE_TTL_HOURS,
+  parserVersion: TURN_CACHE_PARSER_VERSION,
+});
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -362,6 +375,83 @@ function parseTurnHtml(html) {
   };
 }
 
+function getTurnFromMemoryCache(turnId, now) {
+  const cached = turnCache.get(turnId);
+  if (cached && now - cached.ts <= TURN_MEMORY_CACHE_MAX_AGE_MS) {
+    return cached;
+  }
+  return null;
+}
+
+async function fetchTurnFromUpstream(turnId) {
+  const upstream = await fetch(`${TURN_BASE_URL}?TurnID=${encodeURIComponent(turnId)}`, {
+    method: 'GET',
+    headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+  });
+
+  if (!upstream.ok) {
+    return { error: 'Upstream fetch failed', status: upstream.status };
+  }
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  return { data: parseTurnHtml(decodeWindows1252(buffer)) };
+}
+
+function persistTurnCache(turnId, data, cachedAt) {
+  turnCache.set(turnId, { ts: cachedAt, data });
+  if (tournamentCacheStore.enabled) {
+    tournamentCacheStore.upsert(turnId, data, cachedAt);
+  }
+}
+
+async function resolveTurnWithCache(turnId, now, forceRefresh) {
+  if (!forceRefresh) {
+    const inMemory = getTurnFromMemoryCache(turnId, now);
+    if (inMemory) {
+      return {
+        ok: true,
+        data: inMemory.data,
+        cachedAt: inMemory.ts,
+        cache: 'HIT',
+        cacheSource: 'memory'
+      };
+    }
+
+    if (tournamentCacheStore.enabled) {
+      const fromSqlite = tournamentCacheStore.get(turnId, now);
+      if (fromSqlite) {
+        turnCache.set(turnId, { ts: fromSqlite.cachedAt, data: fromSqlite.data });
+        return {
+          ok: true,
+          data: fromSqlite.data,
+          cachedAt: fromSqlite.cachedAt,
+          cache: 'HIT',
+          cacheSource: 'sqlite'
+        };
+      }
+    }
+  }
+
+  const upstreamResult = await fetchTurnFromUpstream(turnId);
+  if (upstreamResult.error) {
+    return {
+      ok: false,
+      error: upstreamResult.error,
+      status: upstreamResult.status
+    };
+  }
+
+  persistTurnCache(turnId, upstreamResult.data, now);
+
+  return {
+    ok: true,
+    data: upstreamResult.data,
+    cachedAt: now,
+    cache: 'MISS',
+    cacheSource: 'upstream'
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
 
@@ -387,22 +477,19 @@ const server = http.createServer(async (req, res) => {
     const BATCH_CONCURRENCY = 8;
 
     async function fetchOneTurn(turnId) {
-      const cached = turnCache.get(turnId);
-      if (cached && now - cached.ts <= TURN_CACHE_MAX_AGE_MS) {
-        return { turnId, ...cached.data, cachedAt: cached.ts, cache: 'HIT' };
-      }
       try {
-        const upstream = await fetch(`${TURN_BASE_URL}?TurnID=${encodeURIComponent(turnId)}`, {
-          method: 'GET',
-          headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
-        });
-        if (!upstream.ok) {
-          return { turnId, error: 'Upstream fetch failed', status: upstream.status };
+        const turnResult = await resolveTurnWithCache(turnId, now, false);
+        if (!turnResult.ok) {
+          return { turnId, error: turnResult.error, status: turnResult.status };
         }
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-        const data = parseTurnHtml(decodeWindows1252(buffer));
-        turnCache.set(turnId, { ts: now, data });
-        return { turnId, ...data, cachedAt: now, cache: 'MISS' };
+
+        return {
+          turnId,
+          ...turnResult.data,
+          cachedAt: turnResult.cachedAt,
+          cache: turnResult.cache,
+          cacheSource: turnResult.cacheSource
+        };
       } catch (err) {
         return { turnId, error: 'Relay request failed', message: err.message };
       }
@@ -504,30 +591,60 @@ const server = http.createServer(async (req, res) => {
 
     const now = Date.now();
     const forceRefresh = reqUrl.searchParams.get('refresh') === '1';
-    const cached = turnCache.get(turnId);
-    if (!forceRefresh && cached && now - cached.ts <= TURN_CACHE_MAX_AGE_MS) {
-      sendJson(res, 200, { ...cached.data, turnId, cachedAt: cached.ts, cache: 'HIT' });
-      return;
-    }
-
     try {
-      const upstream = await fetch(`${TURN_BASE_URL}?TurnID=${encodeURIComponent(turnId)}`, {
-        method: 'GET',
-        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
-      });
-
-      if (!upstream.ok) {
-        sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
+      const turnResult = await resolveTurnWithCache(turnId, now, forceRefresh);
+      if (!turnResult.ok) {
+        sendJson(res, 502, { error: turnResult.error, status: turnResult.status });
         return;
       }
 
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      const data = parseTurnHtml(decodeWindows1252(buffer));
-      turnCache.set(turnId, { ts: now, data });
-      sendJson(res, 200, { ...data, turnId, cachedAt: now, cache: 'MISS' });
+      sendJson(res, 200, {
+        ...turnResult.data,
+        turnId,
+        cachedAt: turnResult.cachedAt,
+        cache: turnResult.cache,
+        cacheSource: turnResult.cacheSource
+      });
     } catch (err) {
       sendJson(res, 502, { error: 'Relay request failed', message: err.message });
     }
+    return;
+  }
+
+  if (reqUrl.pathname === '/api/cache-status') {
+    const now = Date.now();
+    const memoryFresh = [];
+    let staleMemoryEntries = 0;
+
+    for (const [turnId, cached] of turnCache.entries()) {
+      if (now - cached.ts <= TURN_MEMORY_CACHE_MAX_AGE_MS) {
+        memoryFresh.push(turnId);
+      } else {
+        staleMemoryEntries += 1;
+      }
+    }
+
+    const sqliteStats = tournamentCacheStore.enabled ? tournamentCacheStore.stats(now) : null;
+
+    sendJson(res, 200, {
+      now,
+      cachePolicy: {
+        mutableTtlHours: TURN_MUTABLE_TTL_HOURS,
+        immutableDays: TOURNAMENT_IMMUTABLE_DAYS,
+        parserVersion: tournamentCacheStore.parserVersion || TURN_CACHE_PARSER_VERSION,
+      },
+      memoryCache: {
+        freshEntries: memoryFresh.length,
+        staleEntries: staleMemoryEntries,
+      },
+      sqliteCache: {
+        enabled: tournamentCacheStore.enabled,
+        reason: tournamentCacheStore.enabled ? null : tournamentCacheStore.reason,
+        dbPath: tournamentCacheStore.enabled ? CACHE_DB_PATH : null,
+        parserVersion: tournamentCacheStore.parserVersion || null,
+        stats: sqliteStats,
+      }
+    });
     return;
   }
 
@@ -542,4 +659,32 @@ server.listen(PORT, HOST, () => {
   console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
   console.log('If-Only analyzer:', `${base}/tools/if-only/`);
   console.log('Where & Played:', `${base}/tools/where-played/`);
+  if (tournamentCacheStore.enabled) {
+    if (PURGE_OLD_PARSER_VERSIONS_ON_START) {
+      const removed = tournamentCacheStore.deleteRowsForOtherParserVersions();
+      if (removed > 0) {
+        console.log(`Tournament parser-version cleanup removed ${removed} stale entries`);
+      }
+    }
+
+    console.log('Tournament cache (SQLite):', CACHE_DB_PATH);
+    console.log(
+      'Tournament cache policy:',
+      `mutable=${tournamentCacheStore.mutableTtlHours}h, immutable after ${tournamentCacheStore.immutableDays} days, parser=${tournamentCacheStore.parserVersion}`
+    );
+    if (PURGE_OLD_PARSER_VERSIONS_ON_START) {
+      console.log('Tournament parser-version cleanup: enabled on startup');
+    }
+  } else {
+    console.warn('Tournament SQLite cache disabled:', tournamentCacheStore.reason);
+  }
 });
+
+if (tournamentCacheStore.enabled) {
+  setInterval(() => {
+    const removed = tournamentCacheStore.deleteExpiredMutable(Date.now());
+    if (removed > 0) {
+      console.log(`Tournament cache cleanup removed ${removed} expired entries`);
+    }
+  }, TURN_SQLITE_CLEANUP_INTERVAL_MS).unref();
+}
