@@ -115,6 +115,8 @@ The frontend uses local relay endpoints exposed by the Node server:
 
 - `GET /api/hacalle` — all players with current HC
 - `GET /api/lookup?dbfNr=78976` — individual player HC history
+- `POST /api/cache/refresh/hacalle` — force refresh the HACAlle cache
+- `POST /api/cache/refresh/lookup` — force refresh one player cache (JSON body: `{ "dbfNr": "78976" }`)
 - `GET /api/turn?turnId=12345` — single tournament details
 - `POST /api/turns` — batch tournament details (JSON body: `{ "ids": [...] }`)
 - `GET /api/cache-status` — in-memory + SQLite tournament cache health and row stats
@@ -143,6 +145,7 @@ Tournament relay responses are cached in two layers:
 
 By default:
 
+- `/api/lookup` and `/api/hacalle` cache entries are valid for `12` hours.
 - Tournaments older than 60 days are treated as stable and cached without expiration.
 - Newer tournaments use a rolling TTL (`12` hours by default).
 
