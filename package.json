@@ -6,6 +6,11 @@
   "description": "Static analyzers for DBF handicap views",
   "scripts": {
     "build": "eleventy",
+    "cache": "node scripts/cache-admin.js",
+    "cache:status": "npm run cache -- status",
+    "cache:refresh:hacalle": "npm run cache -- refresh hacalle",
+    "cache:clear:all": "npm run cache -- clear all",
+    "cache:clear:hacalle": "npm run cache -- clear hacalle",
     "dev": "concurrently -k -n site,relay \"npm:dev:site\" \"npm:dev:relay\"",
     "dev:site": "eleventy --watch",
     "dev:relay": "PORT=4173 OPEN_ROUTE=/ node server.js",

@@ -58,6 +58,8 @@ function createTournamentCacheStore(options = {}) {
       parserVersion,
       get: () => null,
       upsert: () => null,
+      deleteTurn: () => 0,
+      clearAll: () => 0,
       deleteExpiredMutable: () => 0,
       deleteRowsForOtherParserVersions: () => 0,
       stats: () => null,
@@ -76,6 +78,8 @@ function createTournamentCacheStore(options = {}) {
       parserVersion,
       get: () => null,
       upsert: () => null,
+      deleteTurn: () => 0,
+      clearAll: () => 0,
       deleteExpiredMutable: () => 0,
       deleteRowsForOtherParserVersions: () => 0,
       stats: () => null,
@@ -127,6 +131,7 @@ function createTournamentCacheStore(options = {}) {
   `);
 
   const deleteOneStmt = db.prepare('DELETE FROM turn_cache WHERE turn_id = ?');
+  const clearAllStmt = db.prepare('DELETE FROM turn_cache');
   const deleteExpiredStmt = db.prepare('DELETE FROM turn_cache WHERE immutable = 0 AND expires_at IS NOT NULL AND expires_at <= ?');
   const deleteOtherVersionsStmt = db.prepare('DELETE FROM turn_cache WHERE parser_version <> ?');
   const statsStmt = db.prepare(`
@@ -198,6 +203,24 @@ function createTournamentCacheStore(options = {}) {
     }
   }
 
+  function deleteTurn(turnId) {
+    try {
+      const result = deleteOneStmt.run(String(turnId));
+      return result.changes || 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function clearAll() {
+    try {
+      const result = clearAllStmt.run();
+      return result.changes || 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function deleteRowsForOtherParserVersions() {
     try {
       const result = deleteOtherVersionsStmt.run(parserVersion);
@@ -231,6 +254,8 @@ function createTournamentCacheStore(options = {}) {
     parserVersion,
     get,
     upsert,
+    deleteTurn,
+    clearAll,
     deleteExpiredMutable,
     deleteRowsForOtherParserVersions,
     stats,

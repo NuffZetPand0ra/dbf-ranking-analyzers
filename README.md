@@ -129,10 +129,24 @@ Run only parser/unit tests:
 npm run test:unit
 ```
 
+Inspect or manage caches from the command line while the local relay server is running:
+
+```bash
+npm run cache -- status
+npm run cache -- refresh hacalle
+npm run cache -- refresh lookup 78976
+npm run cache -- clear hacalle
+npm run cache -- clear lookup 78976
+npm run cache -- clear lookup --all
+npm run cache -- clear turns 12345
+npm run cache -- clear turns --all
+```
+
 Notes:
 
 - Tests use committed fixtures in `tests/fixtures/`, so CI does not depend on local `sample_html/` files.
 - API tests run with mocked upstream responses to keep them deterministic.
+- The cache CLI targets `http://127.0.0.1:4173` by default. Override with `CACHE_API_BASE_URL`, or with `HOST` and `PORT`.
 
 ## Data Access
 
@@ -142,8 +156,11 @@ The frontend uses local relay endpoints exposed by the Node server:
 - `GET /api/lookup?dbfNr=78976` — individual player HC history
 - `POST /api/cache/refresh/hacalle` — force refresh the HACAlle cache
 - `POST /api/cache/refresh/lookup` — force refresh one player cache (JSON body: `{ "dbfNr": "78976" }`)
+- `POST /api/cache/clear/hacalle` — clear the HACAlle cache
+- `POST /api/cache/clear/lookup` — clear one player cache (`{ "dbfNr": "78976" }`) or all player caches (`{ "all": true }`)
 - `GET /api/turn?turnId=12345` — single tournament details
 - `POST /api/turns` — batch tournament details (JSON body: `{ "ids": [...] }`)
+- `POST /api/cache/clear/turns` — clear one tournament cache (`{ "turnId": "12345" }`) or all tournament caches (`{ "all": true }`)
 - `GET /api/cache-status` — in-memory + SQLite tournament cache health and row stats
 
 These endpoints proxy DBf sources so the tools can fetch data from the browser without cross-origin issues.

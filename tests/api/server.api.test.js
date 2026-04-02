@@ -79,6 +79,18 @@ describe('API server', () => {
     assert.strictEqual(res.body.error, 'Missing ids array in body');
   });
 
+  it('returns 400 on clear turns endpoint without turnId or all=true', async () => {
+    const server = createTestServer();
+
+    const res = await request(server)
+      .post('/api/cache/clear/turns')
+      .set('Content-Type', 'application/json')
+      .send({});
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.error, 'Missing turnId in body or all=true');
+  });
+
   it('returns per-item mixed results on /api/turns', async () => {
     const server = createTestServer();
     const turnFixture = readFixtureBuffer('turn_pair.html');
@@ -130,5 +142,37 @@ describe('API server', () => {
     assert.strictEqual(statusRes.body.cachePolicy.parserVersion, 'turn-v1');
     assert.strictEqual(statusRes.body.memoryCache.freshEntries, 1);
     assert.strictEqual(statusRes.body.sqliteCache.enabled, false);
+  });
+
+  it('clears a turn from memory cache via dedicated endpoint', async () => {
+    const server = createTestServer();
+    const turnFixture = readFixtureBuffer('turn_pair.html');
+
+    nock('https://medlemmer.bridge.dk')
+      .get('/LookUpTURN.php')
+      .query({ TurnID: '70001' })
+      .times(2)
+      .reply(200, turnFixture);
+
+    const first = await request(server).get('/api/turn?turnId=70001');
+    assert.strictEqual(first.status, 200);
+    assert.strictEqual(first.body.cache, 'MISS');
+
+    const cleared = await request(server)
+      .post('/api/cache/clear/turns')
+      .set('Content-Type', 'application/json')
+      .send({ turnId: '70001' });
+
+    assert.strictEqual(cleared.status, 200);
+    assert.strictEqual(cleared.body.cacheType, 'turns');
+    assert.strictEqual(cleared.body.turnId, '70001');
+    assert.strictEqual(cleared.body.all, false);
+    assert.strictEqual(cleared.body.memoryCleared, 1);
+    assert.strictEqual(cleared.body.persistentCleared, 0);
+
+    const second = await request(server).get('/api/turn?turnId=70001');
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.cache, 'MISS');
+    assert.strictEqual(second.body.cacheSource, 'upstream');
   });
 });

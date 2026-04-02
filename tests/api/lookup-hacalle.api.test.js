@@ -39,6 +39,18 @@ describe('API server lookup/hacalle', () => {
     assert.strictEqual(res.body.error, 'Missing dbfNr in body');
   });
 
+  it('returns 400 on clear lookup endpoint without dbfNr or all=true', async () => {
+    const server = createTestServer();
+
+    const res = await request(server)
+      .post('/api/cache/clear/lookup')
+      .set('Content-Type', 'application/json')
+      .send({});
+
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.body.error, 'Missing dbfNr in body or all=true');
+  });
+
   it('returns MISS then HIT on /api/lookup', async () => {
     const server = createTestServer();
     const lookupFixture = readFixtureBuffer('lookup_dennis.html');
@@ -121,6 +133,100 @@ describe('API server lookup/hacalle', () => {
     const cached = await request(server).get('/api/hacalle');
     assert.strictEqual(cached.status, 200);
     assert.strictEqual(cached.body.cache, 'HIT');
+  });
+
+  it('clears one lookup cache entry via dedicated endpoint', async () => {
+    const server = createTestServer();
+    const lookupFixture = readFixtureBuffer('lookup_dennis.html');
+
+    nock('https://medlemmer.bridge.dk')
+      .get('/LookUpHAC.php')
+      .query({ DBFNr: '78976' })
+      .times(2)
+      .reply(200, lookupFixture);
+
+    const first = await request(server).get('/api/lookup?dbfNr=78976');
+    assert.strictEqual(first.status, 200);
+    assert.strictEqual(first.body.cache, 'MISS');
+
+    const cleared = await request(server)
+      .post('/api/cache/clear/lookup')
+      .set('Content-Type', 'application/json')
+      .send({ dbfNr: '78976' });
+
+    assert.strictEqual(cleared.status, 200);
+    assert.strictEqual(cleared.body.cacheType, 'lookup');
+    assert.strictEqual(cleared.body.dbfNr, '78976');
+    assert.strictEqual(cleared.body.cleared, 1);
+    assert.strictEqual(cleared.body.all, false);
+
+    const second = await request(server).get('/api/lookup?dbfNr=78976');
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.cache, 'MISS');
+  });
+
+  it('clears the HACAlle cache via dedicated endpoint', async () => {
+    const server = createTestServer();
+    const hacalleFixture = readFixtureBuffer('hacalle_rankings.html');
+
+    nock('https://medlemmer.bridge.dk')
+      .get('/HACAlle.php')
+      .times(2)
+      .reply(200, hacalleFixture);
+
+    const first = await request(server).get('/api/hacalle');
+    assert.strictEqual(first.status, 200);
+    assert.strictEqual(first.body.cache, 'MISS');
+
+    const cleared = await request(server).post('/api/cache/clear/hacalle');
+    assert.strictEqual(cleared.status, 200);
+    assert.strictEqual(cleared.body.cacheType, 'hacalle');
+    assert.strictEqual(cleared.body.cleared, 1);
+
+    const second = await request(server).get('/api/hacalle');
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.cache, 'MISS');
+  });
+
+  it('clears all lookup cache entries via dedicated endpoint', async () => {
+    const server = createTestServer();
+    const dennisFixture = readFixtureBuffer('lookup_dennis.html');
+    const esbenFixture = readFixtureBuffer('lookup_esben.html');
+
+    nock('https://medlemmer.bridge.dk')
+      .get('/LookUpHAC.php')
+      .query({ DBFNr: '78976' })
+      .times(2)
+      .reply(200, dennisFixture);
+
+    nock('https://medlemmer.bridge.dk')
+      .get('/LookUpHAC.php')
+      .query({ DBFNr: '23588' })
+      .times(2)
+      .reply(200, esbenFixture);
+
+    const firstDennis = await request(server).get('/api/lookup?dbfNr=78976');
+    const firstEsben = await request(server).get('/api/lookup?dbfNr=23588');
+    assert.strictEqual(firstDennis.status, 200);
+    assert.strictEqual(firstEsben.status, 200);
+
+    const cleared = await request(server)
+      .post('/api/cache/clear/lookup')
+      .set('Content-Type', 'application/json')
+      .send({ all: true });
+
+    assert.strictEqual(cleared.status, 200);
+    assert.strictEqual(cleared.body.cacheType, 'lookup');
+    assert.strictEqual(cleared.body.cleared, 2);
+    assert.strictEqual(cleared.body.all, true);
+    assert.strictEqual(cleared.body.dbfNr, null);
+
+    const secondDennis = await request(server).get('/api/lookup?dbfNr=78976');
+    const secondEsben = await request(server).get('/api/lookup?dbfNr=23588');
+    assert.strictEqual(secondDennis.status, 200);
+    assert.strictEqual(secondDennis.body.cache, 'MISS');
+    assert.strictEqual(secondEsben.status, 200);
+    assert.strictEqual(secondEsben.body.cache, 'MISS');
   });
 
   it('supports refresh=1 to bypass /api/hacalle cache', async () => {

@@ -479,6 +479,35 @@ function createServer(options = {}) {
     }
   }
 
+  function clearLookupCache(dbfNr) {
+    if (dbfNr) {
+      return lookupCache.delete(String(dbfNr)) ? 1 : 0;
+    }
+
+    const cleared = lookupCache.size;
+    lookupCache.clear();
+    return cleared;
+  }
+
+  function clearHacalleCache() {
+    const cleared = hacalleCache ? 1 : 0;
+    hacalleCache = null;
+    return cleared;
+  }
+
+  function clearTurnCache(turnId) {
+    if (turnId) {
+      const memoryCleared = turnCache.delete(String(turnId)) ? 1 : 0;
+      const persistentCleared = tournamentCacheStore.enabled ? tournamentCacheStore.deleteTurn(turnId) : 0;
+      return { memoryCleared, persistentCleared };
+    }
+
+    const memoryCleared = turnCache.size;
+    turnCache.clear();
+    const persistentCleared = tournamentCacheStore.enabled ? tournamentCacheStore.clearAll() : 0;
+    return { memoryCleared, persistentCleared };
+  }
+
   async function resolveTurnWithCache(turnId, now, forceRefresh) {
     if (!forceRefresh) {
       const inMemory = getTurnFromMemoryCache(turnId, now);
@@ -620,6 +649,62 @@ function createServer(options = {}) {
         cachedAt: now,
         cache: 'REFRESH',
         refreshed: true,
+      });
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/cache/clear/hacalle' && req.method === 'POST') {
+      const cleared = clearHacalleCache();
+      sendJson(res, 200, {
+        cacheType: 'hacalle',
+        cleared,
+      });
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/cache/clear/lookup' && req.method === 'POST') {
+      const body = await readJsonBody(req, res);
+      if (!body) {
+        return;
+      }
+
+      const dbfNr = String(body.dbfNr || '').replace(/\D/g, '');
+      const clearAll = body.all === true;
+      if (!dbfNr && !clearAll) {
+        sendJson(res, 400, { error: 'Missing dbfNr in body or all=true' });
+        return;
+      }
+
+      const cleared = clearLookupCache(clearAll ? null : dbfNr);
+      sendJson(res, 200, {
+        cacheType: 'lookup',
+        dbfNr: clearAll ? null : dbfNr,
+        cleared,
+        all: clearAll,
+      });
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/cache/clear/turns' && req.method === 'POST') {
+      const body = await readJsonBody(req, res);
+      if (!body) {
+        return;
+      }
+
+      const turnId = String(body.turnId || '').replace(/\D/g, '');
+      const clearAll = body.all === true;
+      if (!turnId && !clearAll) {
+        sendJson(res, 400, { error: 'Missing turnId in body or all=true' });
+        return;
+      }
+
+      const cleared = clearTurnCache(clearAll ? null : turnId);
+      sendJson(res, 200, {
+        cacheType: 'turns',
+        turnId: clearAll ? null : turnId,
+        all: clearAll,
+        memoryCleared: cleared.memoryCleared,
+        persistentCleared: cleared.persistentCleared,
       });
       return;
     }
