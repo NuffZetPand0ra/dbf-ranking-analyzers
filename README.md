@@ -109,6 +109,31 @@ Useful dev commands:
 - `npm run build`: build the static site into `_site/`
 - `npm run preview`: build first, then serve the production output locally
 
+## Testing
+
+Run all tests:
+
+```bash
+npm test
+```
+
+Run only API tests:
+
+```bash
+npm run test:api
+```
+
+Run only parser/unit tests:
+
+```bash
+npm run test:unit
+```
+
+Notes:
+
+- Tests use committed fixtures in `tests/fixtures/`, so CI does not depend on local `sample_html/` files.
+- API tests run with mocked upstream responses to keep them deterministic.
+
 ## Data Access
 
 The frontend uses local relay endpoints exposed by the Node server:
