@@ -399,6 +399,17 @@ function createServer(options = {}) {
     startup.purgedOldParserRows = tournamentCacheStore.deleteRowsForOtherParserVersions();
   }
 
+  async function readJsonBody(req, res) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    try {
+      return JSON.parse(Buffer.concat(chunks).toString());
+    } catch {
+      sendJson(res, 400, { error: 'Invalid JSON body' });
+      return null;
+    }
+  }
+
   function getTurnFromMemoryCache(turnId, now) {
     const cached = turnCache.get(turnId);
     if (cached && now - cached.ts <= config.turnMemoryCacheMaxAgeMs) {
@@ -425,6 +436,46 @@ function createServer(options = {}) {
     turnCache.set(turnId, { ts: cachedAt, data });
     if (tournamentCacheStore.enabled) {
       tournamentCacheStore.upsert(turnId, data, cachedAt);
+    }
+  }
+
+  async function refreshLookupCache(dbfNr, now) {
+    try {
+      const upstream = await fetchImpl(`${config.lookupBaseUrl}?DBFNr=${encodeURIComponent(dbfNr)}`, {
+        method: 'GET',
+        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+      });
+
+      if (!upstream.ok) {
+        return { ok: false, error: 'Upstream fetch failed', status: upstream.status };
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const data = parseLookupHtml(decodeWindows1252(buffer));
+      lookupCache.set(dbfNr, { ts: now, data });
+      return { ok: true, data };
+    } catch (err) {
+      return { ok: false, error: 'Relay request failed', message: err.message };
+    }
+  }
+
+  async function refreshHacalleCache(now) {
+    try {
+      const upstream = await fetchImpl(config.hacalleUrl, {
+        method: 'GET',
+        headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+      });
+
+      if (!upstream.ok) {
+        return { ok: false, error: 'Upstream fetch failed', status: upstream.status };
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      const players = parseHacalleHtml(decodeWindows1252(buffer));
+      hacalleCache = { ts: now, players };
+      return { ok: true, players };
+    } catch (err) {
+      return { ok: false, error: 'Relay request failed', message: err.message };
     }
   }
 
@@ -480,13 +531,8 @@ function createServer(options = {}) {
     const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
     if (reqUrl.pathname === '/api/turns' && req.method === 'POST') {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      let body;
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString());
-      } catch {
-        sendJson(res, 400, { error: 'Invalid JSON body' });
+      const body = await readJsonBody(req, res);
+      if (!body) {
         return;
       }
       const rawIds = Array.isArray(body.ids) ? body.ids : [];
@@ -532,6 +578,52 @@ function createServer(options = {}) {
       return;
     }
 
+    if (reqUrl.pathname === '/api/cache/refresh/lookup' && req.method === 'POST') {
+      const body = await readJsonBody(req, res);
+      if (!body) {
+        return;
+      }
+
+      const dbfNr = String(body.dbfNr || '').replace(/\D/g, '');
+      if (!dbfNr) {
+        sendJson(res, 400, { error: 'Missing dbfNr in body' });
+        return;
+      }
+
+      const now = Date.now();
+      const refreshed = await refreshLookupCache(dbfNr, now);
+      if (!refreshed.ok) {
+        sendJson(res, 502, { error: refreshed.error, status: refreshed.status, message: refreshed.message });
+        return;
+      }
+
+      sendJson(res, 200, {
+        ...refreshed.data,
+        dbfNr,
+        cachedAt: now,
+        cache: 'REFRESH',
+        refreshed: true,
+      });
+      return;
+    }
+
+    if (reqUrl.pathname === '/api/cache/refresh/hacalle' && req.method === 'POST') {
+      const now = Date.now();
+      const refreshed = await refreshHacalleCache(now);
+      if (!refreshed.ok) {
+        sendJson(res, 502, { error: refreshed.error, status: refreshed.status, message: refreshed.message });
+        return;
+      }
+
+      sendJson(res, 200, {
+        players: refreshed.players,
+        cachedAt: now,
+        cache: 'REFRESH',
+        refreshed: true,
+      });
+      return;
+    }
+
     if (req.method !== 'GET') {
       sendJson(res, 405, { error: 'Method not allowed' });
       return;
@@ -547,25 +639,13 @@ function createServer(options = {}) {
         return;
       }
 
-      try {
-        const upstream = await fetchImpl(config.hacalleUrl, {
-          method: 'GET',
-          headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
-        });
-
-        if (!upstream.ok) {
-          sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
-          return;
-        }
-
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-        const players = parseHacalleHtml(decodeWindows1252(buffer));
-        hacalleCache = { ts: now, players };
-
-        sendJson(res, 200, { players, cachedAt: now, cache: 'MISS' });
-      } catch (err) {
-        sendJson(res, 502, { error: 'Relay request failed', message: err.message });
+      const refreshed = await refreshHacalleCache(now);
+      if (!refreshed.ok) {
+        sendJson(res, 502, { error: refreshed.error, status: refreshed.status, message: refreshed.message });
+        return;
       }
+
+      sendJson(res, 200, { players: refreshed.players, cachedAt: now, cache: 'MISS' });
       return;
     }
 
@@ -584,24 +664,13 @@ function createServer(options = {}) {
         return;
       }
 
-      try {
-        const upstream = await fetchImpl(`${config.lookupBaseUrl}?DBFNr=${encodeURIComponent(dbfNr)}`, {
-          method: 'GET',
-          headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
-        });
-
-        if (!upstream.ok) {
-          sendJson(res, 502, { error: 'Upstream fetch failed', status: upstream.status });
-          return;
-        }
-
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-        const data = parseLookupHtml(decodeWindows1252(buffer));
-        lookupCache.set(dbfNr, { ts: now, data });
-        sendJson(res, 200, { ...data, dbfNr, cachedAt: now, cache: 'MISS' });
-      } catch (err) {
-        sendJson(res, 502, { error: 'Relay request failed', message: err.message });
+      const refreshed = await refreshLookupCache(dbfNr, now);
+      if (!refreshed.ok) {
+        sendJson(res, 502, { error: refreshed.error, status: refreshed.status, message: refreshed.message });
+        return;
       }
+
+      sendJson(res, 200, { ...refreshed.data, dbfNr, cachedAt: now, cache: 'MISS' });
       return;
     }
 
