@@ -14,12 +14,18 @@
     "dev:histogram": "concurrently -k -n site,relay \"npm:dev:site\" \"PORT=4175 OPEN_ROUTE=/tools/handicap-distribution/ node server.js\"",
     "dev:badge": "concurrently -k -n site,relay \"npm:dev:site\" \"PORT=4176 OPEN_ROUTE=/tools/player-badge/ node server.js\"",
     "dev:if-only": "concurrently -k -n site,relay \"npm:dev:site\" \"PORT=4177 OPEN_ROUTE=/tools/if-only/ node server.js\"",
-    "preview": "npm run build && PORT=4173 OPEN_ROUTE=/ node server.js"
+    "preview": "npm run build && PORT=4173 OPEN_ROUTE=/ node server.js",
+    "test": "mocha \"tests/**/*.test.js\" --timeout 10000",
+    "test:api": "mocha \"tests/api/**/*.test.js\" --timeout 10000",
+    "test:unit": "mocha \"tests/unit/**/*.test.js\" --timeout 10000"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.5",
     "@11ty/eleventy-plugin-handlebars": "^1.0.0",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "mocha": "^11.7.1",
+    "nock": "^14.0.10",
+    "supertest": "^7.1.4"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
