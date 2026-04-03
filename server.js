@@ -514,7 +514,7 @@ async function resolveStaticFile(staticRoot, pathname) {
   return null;
 }
 
-async function serveStatic(staticRoot, reqUrl, res) {
+async function serveStatic(staticRoot, reqUrl, res, method = 'GET') {
   const pathname = decodeURIComponent(reqUrl.pathname);
   const filePath = await resolveStaticFile(staticRoot, pathname);
 
@@ -532,6 +532,10 @@ async function serveStatic(staticRoot, reqUrl, res) {
       'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
       ...(shouldNoIndex ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
     });
+    if (method === 'HEAD') {
+      res.end();
+      return;
+    }
     fs.createReadStream(filePath).pipe(res);
   } catch (_) {
     sendJson(res, 404, { error: 'Not found' });
@@ -999,11 +1003,15 @@ function createServer(options = {}) {
       ? `/google${config.googleSiteVerificationId}.html`
       : null;
 
-    if (googlePath && reqUrl.pathname === googlePath && req.method === 'GET') {
+    if (googlePath && reqUrl.pathname === googlePath && (req.method === 'GET' || req.method === 'HEAD')) {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
       });
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
       res.end(`google-site-verification: google${config.googleSiteVerificationId}.html\n`);
       return;
     }
@@ -1154,7 +1162,7 @@ function createServer(options = {}) {
       return;
     }
 
-    if (req.method !== 'GET') {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
       sendJson(res, 405, { error: 'Method not allowed' });
       return;
     }
@@ -1281,7 +1289,7 @@ function createServer(options = {}) {
       return;
     }
 
-    await serveStatic(config.staticRoot, reqUrl, res);
+    await serveStatic(config.staticRoot, reqUrl, res, req.method);
   });
 
   let cleanupTimer = null;

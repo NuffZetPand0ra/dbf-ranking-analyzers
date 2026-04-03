@@ -182,4 +182,26 @@ describe('API server', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.text, 'google-site-verification: google30d00bb02eef3b20.html\n');
   });
+
+  it('supports HEAD on google site verification route', async () => {
+    const server = createTestServer({
+      env: {
+        GOOGLE_SITE_VERIFICATION_ID: '30d00bb02eef3b20',
+      },
+    });
+
+    const res = await request(server).head('/google30d00bb02eef3b20.html');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, undefined);
+  });
+
+  it('supports HEAD on static sitemap.xml', async () => {
+    const server = createTestServer();
+
+    const res = await request(server).head('/sitemap.xml');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, undefined);
+  });
 });
