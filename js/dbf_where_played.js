@@ -1081,7 +1081,7 @@ async function loadPlayer(dbfNr, options = {}) {
     const onProgress = progress => {
       if (requestSeq !== loadRequestSeq) return;
       setLoadProgress(progress);
-      setLoadStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}`, '', true);
+      setLoadStatus(`Henter turneringsdetaljer for ${currentPlayer.name}: ${progress.done}/${progress.total}`, '', true);
     };
 
     const result = await analyzePlayer(currentPlayer, loadController.signal, onProgress);

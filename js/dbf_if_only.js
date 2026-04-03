@@ -847,7 +847,7 @@ async function refreshSourceCatalog() {
     const onProgress = progress => {
       if (token !== sourceRefreshToken) return;
       setSourceProgress(progress);
-      setSourceStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}`, '', true);
+      setSourceStatus(`Henter turneringsdetaljer for ${currentPlayer.name}: ${progress.done}/${progress.total}`, '', true);
     };
 
     const result = await summarizePlayerSources(currentPlayer, sourceLoadController.signal, onProgress);
@@ -1026,6 +1026,12 @@ function render() {
 
 async function loadPlayer(dbfNr) {
   if (!dbfNr) return;
+  const normalizedEarly = String(dbfNr).replace(/\D/g, '');
+  if (normalizedEarly) {
+    const p = new URLSearchParams();
+    p.set('p', normalizedEarly);
+    window.history.replaceState({}, '', window.location.pathname + '?' + p.toString());
+  }
   setStatus('Henter...', '');
 
   try {
