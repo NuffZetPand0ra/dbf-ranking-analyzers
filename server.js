@@ -524,9 +524,11 @@ async function serveStatic(staticRoot, reqUrl, res) {
   try {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME[ext] || 'application/octet-stream';
+    const shouldNoIndex = pathname === '/tools/if-only/' || pathname === '/tools/if-only/index.html';
     res.writeHead(200, {
       'Content-Type': contentType,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300'
+      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      ...(shouldNoIndex ? { 'X-Robots-Tag': 'noindex, nofollow' } : {})
     });
     fs.createReadStream(filePath).pipe(res);
   } catch (_) {
