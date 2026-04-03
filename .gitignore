@@ -1,6 +1,7 @@
 node_modules/
 _site/
 sample_html/
+google*.html
 
 # Ignore all dotfiles/dotfolders by default
 .*

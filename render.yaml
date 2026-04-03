@@ -24,3 +24,5 @@ services:
         value: turn-v1
       - key: TURN_CACHE_PURGE_OLD_VERSIONS_ON_START
         value: "0"
+      - key: GOOGLE_SITE_VERIFICATION_FILE
+        sync: false

@@ -26,6 +26,7 @@ module.exports = function (eleventyConfig) {
   eleventyConfig.addPassthroughCopy({ 'css': 'css' });
   eleventyConfig.addPassthroughCopy({ 'js': 'js' });
   eleventyConfig.addPassthroughCopy({ '.well-known': '.well-known' });
+  eleventyConfig.addPassthroughCopy('google*.html');
   eleventyConfig.addPassthroughCopy({ 'favicon.svg': 'favicon.svg' });
   eleventyConfig.addPassthroughCopy({ 'manifest.json': 'manifest.json' });
   eleventyConfig.addPassthroughCopy({ 'robots.txt': 'robots.txt' });

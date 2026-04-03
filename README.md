@@ -178,6 +178,38 @@ Deploy flow:
 
 Render runs `npm install && npm run build` and then starts `server.js` to serve the generated site and relay API.
 
+## Google Site Verification Files
+
+Google verification files are generated during build from an environment variable and then copied as static files by Eleventy (`google*.html`).
+
+Set this environment variable:
+
+- `GOOGLE_SITE_VERIFICATION_FILE` with value `google<token>.html`
+
+Example:
+
+- `GOOGLE_SITE_VERIFICATION_FILE=google30d00bb02eef3b20.html`
+
+The build step creates a file with this exact payload:
+
+- `google-site-verification: google30d00bb02eef3b20.html`
+
+How to use locally:
+
+1. Export `GOOGLE_SITE_VERIFICATION_FILE`
+2. Run `npm run build`
+3. The file is generated in repo root and served at `/<filename>`
+
+How to use on Render:
+
+1. Set `GOOGLE_SITE_VERIFICATION_FILE` in the Render service environment
+2. Deploy (build runs and generates the static verification file)
+
+Privacy and collaboration notes:
+
+- `google*.html` is gitignored, so personal verification tokens are not committed by default
+- each contributor can set their own env var value without changing tracked files
+
 ## Tournament Cache Persistence
 
 Tournament relay responses are cached in two layers:
