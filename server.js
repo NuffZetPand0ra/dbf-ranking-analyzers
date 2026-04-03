@@ -838,17 +838,30 @@ function createServer(options = {}) {
   }
 
   async function fetchTurnFromUpstream(turnId) {
-    const upstream = await fetchImpl(`${config.turnBaseUrl}?TurnID=${encodeURIComponent(turnId)}`, {
-      method: 'GET',
-      headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
-    });
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let upstream;
+      try {
+        upstream = await fetchImpl(`${config.turnBaseUrl}?TurnID=${encodeURIComponent(turnId)}`, {
+          method: 'GET',
+          headers: { 'User-Agent': 'dbf-ranking-analyzers/1.0 relay' }
+        });
+      } catch (err) {
+        // Network/connection error — retry with backoff
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+        return { error: 'Relay request failed', message: err.message };
+      }
 
-    if (!upstream.ok) {
-      return { error: 'Upstream fetch failed', status: upstream.status };
+      if (!upstream.ok) {
+        return { error: 'Upstream fetch failed', status: upstream.status };
+      }
+
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      return { data: parseTurnHtml(decodeWindows1252(buffer)) };
     }
-
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    return { data: parseTurnHtml(decodeWindows1252(buffer)) };
   }
 
   function persistTurnCache(turnId, data, cachedAt) {

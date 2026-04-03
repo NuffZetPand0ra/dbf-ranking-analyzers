@@ -1031,6 +1031,12 @@ partnerSelectEl.addEventListener('change', () => {
 
 async function loadPlayer(dbfNr, options = {}) {
   if (!dbfNr) return;
+  const normalizedDbfNrEarly = String(dbfNr).replace(/\D/g, '');
+  if (normalizedDbfNrEarly) {
+    const immediateParams = new URLSearchParams();
+    immediateParams.set('p', normalizedDbfNrEarly);
+    window.history.replaceState({}, '', window.location.pathname + '?' + immediateParams.toString());
+  }
   pendingUiState = options.restoreState || null;
   const requestSeq = ++loadRequestSeq;
   setStatus('Henter...', '');
