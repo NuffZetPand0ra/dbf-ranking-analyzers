@@ -34,6 +34,9 @@ const sourceTypeEl = document.getElementById('ifonly-source-type');
 const sourceEl = document.getElementById('ifonly-source');
 const hintEl = document.getElementById('ifonly-hint');
 const sourceStatusEl = document.getElementById('ifonly-source-status');
+const progressWrapEl = document.getElementById('ifonly-progress-wrap');
+const progressBarEl = document.getElementById('ifonly-progress-bar');
+const progressMetaEl = document.getElementById('ifonly-progress-meta');
 const shareBtnEl = document.getElementById('ifonly-share-btn');
 const emptyEl = document.getElementById('ifonly-empty');
 const wrapEl = document.getElementById('ifonly-wrap');
@@ -44,6 +47,16 @@ const sourceDetailEl = document.getElementById('ifonly-source-detail');
 const chartEl = document.getElementById('ifonly-chart');
 const statsEl = document.getElementById('ifonly-stats');
 const noteEl = document.getElementById('ifonly-note');
+
+const TURN_BATCH_SIZE = 75;
+const TURN_BATCH_CONCURRENCY = 3;
+const ETA_RECALC_INTERVAL_MS = 20 * 1000;
+const ETA_TICK_MS = 1000;
+
+let etaTicker = null;
+let etaTargetAtMs = null;
+let etaNextRecalcAtMs = 0;
+let latestLoadProgress = null;
 
 function parseNumber(value) {
   const parsed = parseFloat(String(value ?? '').replace(/\u00a0/g, '').replace(/\s+/g, '').replace(',', '.'));
@@ -246,6 +259,116 @@ async function fetchTurnData(turnId, signal) {
   return normalized;
 }
 
+function chunkArray(list, size) {
+  const chunks = [];
+  for (let i = 0; i < list.length; i += size) {
+    chunks.push(list.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function estimateEtaSeconds(startedAtMs, completedUncached, totalUncached) {
+  if (!startedAtMs || completedUncached <= 0 || totalUncached <= completedUncached) return null;
+  const elapsedSeconds = (Date.now() - startedAtMs) / 1000;
+  if (elapsedSeconds <= 0) return null;
+  const perSecond = completedUncached / elapsedSeconds;
+  if (!Number.isFinite(perSecond) || perSecond <= 0) return null;
+  const remaining = totalUncached - completedUncached;
+  return Math.max(1, Math.ceil(remaining / perSecond));
+}
+
+async function fetchTurnDataBatch(turnIds, signal, onProgress) {
+  const results = new Map();
+  const uncachedIds = [];
+  for (const id of turnIds) {
+    if (!id) continue;
+    if (turnDataMemo.has(id)) {
+      results.set(id, turnDataMemo.get(id));
+      continue;
+    }
+    const cached = readTurnCache(id);
+    if (cached) {
+      turnDataMemo.set(id, cached);
+      results.set(id, cached);
+    } else {
+      uncachedIds.push(id);
+    }
+  }
+
+  const progressState = {
+    total: turnIds.length,
+    done: results.size,
+    cached: results.size,
+    fetched: 0,
+    failed: 0,
+    etaSeconds: null,
+  };
+  if (onProgress) onProgress(progressState);
+
+  if (!uncachedIds.length) {
+    return results;
+  }
+
+  const startedAtMs = Date.now();
+  const chunks = chunkArray(uncachedIds, TURN_BATCH_SIZE);
+  let nextChunk = 0;
+
+  async function worker() {
+    while (nextChunk < chunks.length) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      const idx = nextChunk++;
+      const chunk = chunks[idx];
+
+      const res = await fetch('/api/turns?ids=' + chunk.join(','), { signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const json = await res.json();
+      const responseItems = Array.isArray(json.results) ? json.results : [];
+      const seenIds = new Set();
+
+      for (const item of responseItems) {
+        const turnId = String(item?.turnId ?? '').replace(/\D/g, '');
+        if (!turnId || seenIds.has(turnId)) continue;
+        seenIds.add(turnId);
+
+        if (item.error) {
+          results.set(turnId, null);
+          progressState.failed += 1;
+          continue;
+        }
+
+        const normalized = normalizeTurnResponse(item);
+        if (normalized) {
+          writeTurnCache(turnId, item);
+          turnDataMemo.set(turnId, normalized);
+          results.set(turnId, normalized);
+        } else {
+          results.set(turnId, null);
+          progressState.failed += 1;
+        }
+      }
+
+      for (const requestedId of chunk) {
+        if (seenIds.has(requestedId)) continue;
+        if (!results.has(requestedId)) {
+          results.set(requestedId, null);
+          progressState.failed += 1;
+        }
+      }
+
+      progressState.fetched += chunk.length;
+      progressState.done = progressState.cached + progressState.fetched;
+      progressState.etaSeconds = estimateEtaSeconds(startedAtMs, progressState.fetched, uncachedIds.length);
+      if (onProgress) onProgress(progressState);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(TURN_BATCH_CONCURRENCY, chunks.length) }, () => worker());
+  await Promise.all(workers);
+
+  return results;
+}
+
 function readAllPlayersCache() {
   try {
     const raw = localStorage.getItem(ALL_PLAYERS_CACHE_KEY);
@@ -320,6 +443,97 @@ function setSourceStatus(msg, cls, showCancel = false) {
   } else {
     sourceStatusEl.textContent = msg || '';
   }
+}
+
+function formatDurationHms(seconds) {
+  const total = Math.max(0, Math.round(seconds || 0));
+  const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function formatClockHms(timestampMs) {
+  if (!timestampMs) return '';
+  const d = new Date(timestampMs);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function stopEtaTicker() {
+  if (etaTicker) {
+    clearInterval(etaTicker);
+    etaTicker = null;
+  }
+}
+
+function renderProgressMeta() {
+  if (!progressMetaEl || !latestLoadProgress) return;
+  const progress = latestLoadProgress;
+  const failText = progress.failed ? ` · fejl ${progress.failed}` : '';
+  let etaText = '';
+
+  if (etaTargetAtMs && progress.done < progress.total) {
+    const remainingSeconds = Math.max(0, Math.ceil((etaTargetAtMs - Date.now()) / 1000));
+    etaText = ` · est. færdig ${formatClockHms(etaTargetAtMs)} · tilbage ${formatDurationHms(remainingSeconds)}`;
+  }
+
+  progressMetaEl.textContent = `${progress.done}/${progress.total} · cache ${progress.cached} · hentet ${progress.fetched}${failText}${etaText}`;
+}
+
+function setSourceProgress(progress) {
+  if (!progressWrapEl || !progressBarEl || !progressMetaEl) return;
+  if (!progress || !progress.total) {
+    latestLoadProgress = null;
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
+    progressWrapEl.style.display = 'none';
+    progressBarEl.style.width = '0%';
+    progressMetaEl.textContent = '';
+    return;
+  }
+
+  latestLoadProgress = {
+    total: progress.total,
+    done: progress.done,
+    cached: progress.cached,
+    fetched: progress.fetched,
+    failed: progress.failed,
+  };
+
+  progressWrapEl.style.display = '';
+  const pct = Math.max(0, Math.min(100, (progress.done / progress.total) * 100));
+  const track = progressBarEl.parentElement;
+  if (track) track.setAttribute('aria-valuenow', String(Math.round(pct)));
+  progressBarEl.style.width = `${pct}%`;
+
+  const now = Date.now();
+  if (progress.etaSeconds && progress.done < progress.total) {
+    if (!etaTargetAtMs || now >= etaNextRecalcAtMs) {
+      etaTargetAtMs = now + progress.etaSeconds * 1000;
+      etaNextRecalcAtMs = now + ETA_RECALC_INTERVAL_MS;
+    }
+    if (!etaTicker) {
+      etaTicker = setInterval(() => {
+        if (!latestLoadProgress || latestLoadProgress.done >= latestLoadProgress.total) {
+          stopEtaTicker();
+          return;
+        }
+        renderProgressMeta();
+      }, ETA_TICK_MS);
+    }
+  }
+
+  if (progress.done >= progress.total) {
+    etaTargetAtMs = null;
+    etaNextRecalcAtMs = 0;
+    stopEtaTicker();
+  }
+
+  renderProgressMeta();
 }
 
 function playerMatchesQuery(player, query) {
@@ -407,17 +621,10 @@ async function mapLimit(items, limit, iteratee) {
   return results;
 }
 
-async function summarizePlayerSources(player, signal) {
+async function summarizePlayerSources(player, signal, onProgress) {
   const relevantEntries = player.entries.filter(entry => entry.turnId);
   const turnIds = [...new Set(relevantEntries.map(entry => entry.turnId))];
-  const turnResults = await mapLimit(turnIds, 6, async turnId => {
-    try {
-      const turn = await fetchTurnData(turnId, signal);
-      return { turnId, turn, error: null };
-    } catch (error) {
-      return { turnId, turn: null, error };
-    }
-  });
+  const turnResultsMap = await fetchTurnDataBatch(turnIds, signal, onProgress);
 
   const playerKey = normalizeName(player.name);
   const resolvedPartnersByTurn = new Map();
@@ -428,23 +635,24 @@ async function summarizePlayerSources(player, signal) {
     unresolvedTurns: 0,
   };
 
-  for (const result of turnResults) {
-    if (result.error || !result.turn || !result.turn.groups.length) {
+  for (const turnId of turnIds) {
+    const turn = turnResultsMap.get(turnId);
+    if (!turn || !turn.groups.length) {
       coverage.unresolvedTurns += 1;
       continue;
     }
 
     let linkedPlayers = null;
-    if (result.turn.formatHint === 'pair') {
-      for (const group of result.turn.groups) {
+    if (turn.formatHint === 'pair') {
+      for (const group of turn.groups) {
         if (!group.players.some(groupPlayer => normalizeName(groupPlayer.name) === playerKey)) continue;
         linkedPlayers = group.players
           .map(groupPlayer => groupPlayer.name)
           .filter(name => normalizeName(name) !== playerKey);
         break;
       }
-    } else if (result.turn.formatHint === 'team-known-seating') {
-      for (const group of result.turn.groups) {
+    } else if (turn.formatHint === 'team-known-seating') {
+      for (const group of turn.groups) {
         const self = group.players.find(groupPlayer => normalizeName(groupPlayer.name) === playerKey);
         if (!self) continue;
         const selfDirection = String(self.direction || '').trim().toLowerCase();
@@ -457,7 +665,7 @@ async function summarizePlayerSources(player, signal) {
     }
 
     if (linkedPlayers && linkedPlayers.length) {
-      resolvedPartnersByTurn.set(result.turnId, [...new Set(linkedPlayers)]);
+      resolvedPartnersByTurn.set(turnId, [...new Set(linkedPlayers)]);
       coverage.resolvedTurns += 1;
     } else {
       coverage.unresolvedTurns += 1;
@@ -600,6 +808,7 @@ function updateHint() {
 
 async function refreshSourceCatalog() {
   updateHint();
+  setSourceProgress(null);
   currentSourceCatalog = [];
   currentPlayerEntrySources = new Map();
   currentSourceCoverage = {
@@ -635,7 +844,13 @@ async function refreshSourceCatalog() {
   setSourceStatus('Henter turneringshistorik...', '', true);
 
   try {
-    const result = await summarizePlayerSources(currentPlayer, sourceLoadController.signal);
+    const onProgress = progress => {
+      if (token !== sourceRefreshToken) return;
+      setSourceProgress(progress);
+      setSourceStatus(`Henter turneringsdetaljer: ${progress.done}/${progress.total}`, '', true);
+    };
+
+    const result = await summarizePlayerSources(currentPlayer, sourceLoadController.signal, onProgress);
     if (token !== sourceRefreshToken) return;
 
     currentSourceCatalog = result.sources;
@@ -660,6 +875,7 @@ async function refreshSourceCatalog() {
       setSourceStatus('Fejl ved indlæsning: ' + err.message, 'err');
     }
   } finally {
+    if (token === sourceRefreshToken) setSourceProgress(null);
     sourceLoadController = null;
   }
 }
