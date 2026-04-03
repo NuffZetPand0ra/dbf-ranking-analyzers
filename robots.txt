@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /tools/if-only/
 
 Sitemap: https://dbf-ranking-analyzers.onrender.com/sitemap.xml
 Disallow: /sample_html/

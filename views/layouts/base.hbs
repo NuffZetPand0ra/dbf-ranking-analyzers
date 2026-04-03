@@ -17,6 +17,9 @@
 <meta property="og:type" content="website">
 <meta property="og:locale" content="da_DK">
 <meta property="og:image" content="/favicon.svg">
+{{#if robots}}
+<meta name="robots" content="{{robots}}">
+{{/if}}
 <link rel="sitemap" href="/sitemap.xml" type="application/xml">
 <title>{{title}}</title>
 {{#each headScripts}}
