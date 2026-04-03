@@ -169,4 +169,17 @@ describe('API server', () => {
     assert.strictEqual(second.body.cache, 'MISS');
     assert.strictEqual(second.body.cacheSource, 'upstream');
   });
+
+  it('serves google site verification payload from env id', async () => {
+    const server = createTestServer({
+      env: {
+        GOOGLE_SITE_VERIFICATION_ID: '30d00bb02eef3b20',
+      },
+    });
+
+    const res = await request(server).get('/google30d00bb02eef3b20.html');
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.text, 'google-site-verification: google30d00bb02eef3b20.html\n');
+  });
 });

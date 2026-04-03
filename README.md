@@ -180,35 +180,34 @@ Render runs `npm install && npm run build` and then starts `server.js` to serve 
 
 ## Google Site Verification Files
 
-Google verification files are generated during build from an environment variable and then copied as static files by Eleventy (`google*.html`).
+Google verification is served dynamically by the Node server and is not stored on disk.
 
 Set this environment variable:
 
-- `GOOGLE_SITE_VERIFICATION_FILE` with value `google<token>.html`
+- `GOOGLE_SITE_VERIFICATION_ID` with the token only (no `google` prefix and no `.html` suffix)
 
 Example:
 
-- `GOOGLE_SITE_VERIFICATION_FILE=google30d00bb02eef3b20.html`
+- `GOOGLE_SITE_VERIFICATION_ID=30d00bb02eef3b20`
 
-The build step creates a file with this exact payload:
+With that value, the server responds on:
+
+- `/google30d00bb02eef3b20.html`
+
+And returns this exact payload:
 
 - `google-site-verification: google30d00bb02eef3b20.html`
 
-How to use locally:
-
-1. Export `GOOGLE_SITE_VERIFICATION_FILE`
-2. Run `npm run build`
-3. The file is generated in repo root and served at `/<filename>`
-
 How to use on Render:
 
-1. Set `GOOGLE_SITE_VERIFICATION_FILE` in the Render service environment
-2. Deploy (build runs and generates the static verification file)
+1. Set `GOOGLE_SITE_VERIFICATION_ID` in the Render service environment
+2. Deploy or restart the service
 
-Privacy and collaboration notes:
+How to use locally:
 
-- `google*.html` is gitignored, so personal verification tokens are not committed by default
-- each contributor can set their own env var value without changing tracked files
+1. Export `GOOGLE_SITE_VERIFICATION_ID`
+2. Start the relay server (`npm run dev` or `node server.js`)
+3. Open `http://127.0.0.1:4173/google<id>.html`
 
 ## Tournament Cache Persistence
 

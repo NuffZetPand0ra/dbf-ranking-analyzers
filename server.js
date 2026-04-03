@@ -442,6 +442,7 @@ const SWAGGER_UI_HTML = `<!DOCTYPE html>
 
 function readConfigFromEnv(env = process.env) {
   const root = process.cwd();
+  const googleSiteVerificationId = String(env.GOOGLE_SITE_VERIFICATION_ID || '').trim();
   return {
     port: Number(env.PORT || 4173),
     host: env.HOST || '127.0.0.1',
@@ -460,6 +461,7 @@ function readConfigFromEnv(env = process.env) {
     purgeOldParserVersionsOnStart: env.TURN_CACHE_PURGE_OLD_VERSIONS_ON_START === '1',
     cacheDbPath: env.CACHE_DB_PATH || path.join(root, '.cache', 'tournament-cache.sqlite'),
     turnSqliteCleanupIntervalMs: 30 * 60 * 1000,
+    googleSiteVerificationId: /^[a-zA-Z0-9]+$/.test(googleSiteVerificationId) ? googleSiteVerificationId : '',
   };
 }
 
@@ -992,6 +994,19 @@ function createServer(options = {}) {
 
   const server = http.createServer(async (req, res) => {
     const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+    const googlePath = config.googleSiteVerificationId
+      ? `/google${config.googleSiteVerificationId}.html`
+      : null;
+
+    if (googlePath && reqUrl.pathname === googlePath && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(`google-site-verification: google${config.googleSiteVerificationId}.html\n`);
+      return;
+    }
 
     if (reqUrl.pathname === '/api/turns' && req.method === 'GET') {
       const rawIds = (reqUrl.searchParams.get('ids') || '').split(',');
