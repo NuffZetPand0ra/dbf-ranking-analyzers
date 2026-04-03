@@ -48,5 +48,23 @@
 
     applyTheme(getTheme());
     btn.addEventListener('click', toggle);
+
+    const isDashboard = window.location.pathname === '/' || window.location.pathname === '/index.html';
+    if (isDashboard) {
+      const eggSequence = 'hvis';
+      let eggBuffer = '';
+
+      document.addEventListener('keydown', (event) => {
+        const key = String(event.key || '').toLowerCase();
+        if (!/^[a-z]$/.test(key)) {
+          return;
+        }
+
+        eggBuffer = (eggBuffer + key).slice(-eggSequence.length);
+        if (eggBuffer === eggSequence) {
+          window.location.href = '/tools/if-only/';
+        }
+      });
+    }
   });
 })();
