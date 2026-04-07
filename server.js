@@ -1331,9 +1331,9 @@ function startServer(options = {}) {
     console.log('DBf analyzer server started');
     console.log('Open:', `${base}${config.defaultRoute}`);
     console.log('Handicap comparison:', `${base}/tools/handicap-comparison/`);
+    console.log('Where & Played:', `${base}/tools/where-played/`);
     console.log('Handicap distribution:', `${base}/tools/handicap-distribution/`);
     console.log('If-Only analyzer:', `${base}/tools/if-only/`);
-    console.log('Where & Played:', `${base}/tools/where-played/`);
     if (tournamentCacheStore.enabled) {
       if (config.purgeOldParserVersionsOnStart && startup.purgedOldParserRows > 0) {
         console.log(`Tournament parser-version cleanup removed ${startup.purgedOldParserRows} stale entries`);
