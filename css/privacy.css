@@ -1,0 +1,133 @@
+.privacy-page {
+  max-width: 1080px;
+}
+
+.privacy-hero,
+.privacy-section,
+.privacy-contact {
+  padding: 1.05rem 1.15rem;
+}
+
+.privacy-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.9fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.privacy-lead {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.8;
+  max-width: 68ch;
+}
+
+.privacy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+}
+
+.privacy-hero-side {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-muted) 92%, rgba(20, 184, 166, 0.05));
+  padding: 0.9rem 1rem;
+}
+
+.privacy-checklist {
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0;
+}
+
+.privacy-checklist li {
+  position: relative;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.privacy-checklist li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.privacy-section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.privacy-section p,
+.privacy-section li,
+.privacy-contact p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.privacy-section ul {
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.privacy-contact {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.privacy-updated {
+  margin-top: 0.8rem;
+  padding-left: 0.15rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.privacy-page code {
+  font-family: 'IBM Plex Mono', monospace;
+  background: color-mix(in srgb, var(--surface-muted) 90%, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.08rem 0.35rem;
+}
+
+@media (max-width: 760px) {
+  .privacy-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .privacy-hero,
+  .privacy-section,
+  .privacy-contact {
+    padding: 0.95rem 1rem;
+  }
+
+  .privacy-lead {
+    font-size: 0.95rem;
+  }
+}
