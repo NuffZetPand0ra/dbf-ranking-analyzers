@@ -30,11 +30,18 @@ permalink: /tools/handicap-distribution/index.html
   </div>
 </header>
 
-<div id="noDataOverlay">
+<div id="noDataOverlay" data-mode="help" aria-hidden="true">
   <div id="noDataBox">
-    <button id="closeOverlay" type="button" title="Luk">✕</button>
-    <h2>Sådan henter du data</h2>
-    <p>Klik på knappen "🌐 Hent fra DBf" ovenfor for at hente den nyeste handicapliste automatisk.</p>
+    <div class="no-data-loading" aria-live="polite">
+      <div class="hh-loading-spinner" aria-hidden="true"></div>
+      <p>Henter klubdata fra DBf…</p>
+    </div>
+    <div class="no-data-help">
+      <button id="closeOverlay" type="button" title="Luk">✕</button>
+      <h2>Om data</h2>
+      <p>Siden henter handicaplisten automatisk fra DBf, når den åbnes.</p>
+      <p>Brug knappen "🌐 Hent fra DBf" hvis du vil opdatere manuelt igen.</p>
+    </div>
   </div>
 </div>
 

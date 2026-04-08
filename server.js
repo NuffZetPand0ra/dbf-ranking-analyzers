@@ -22,6 +22,13 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+const ROOT_STATIC_FALLBACKS = new Set([
+  'favicon.svg',
+  'manifest.json',
+  'robots.txt',
+  'sitemap.xml'
+]);
+
 function buildOpenApiSpec() {
   return {
     openapi: '3.0.3',
@@ -448,6 +455,7 @@ function readConfigFromEnv(env = process.env) {
     port: Number(env.PORT || 4173),
     host: env.HOST || '127.0.0.1',
     root,
+    publicRoot: root,
     staticRoot: path.join(root, '_site'),
     defaultRoute: env.OPEN_ROUTE || '/',
     hacalleUrl: HACALLE_URL,
@@ -480,15 +488,15 @@ function isSafePath(staticRoot, candidatePath) {
   return resolved.startsWith(staticRoot + path.sep) || resolved === staticRoot;
 }
 
-async function resolveStaticFile(staticRoot, pathname) {
+async function resolveStaticFile(staticRoot, pathname, fallbackRoot = null) {
   const candidates = [];
+  const cleanPath = pathname.replace(/^\/+/, '');
 
   if (pathname === '/') {
     candidates.push('index.html');
   } else if (pathname.endsWith('/')) {
-    candidates.push(path.join(pathname.replace(/^\/+/, ''), 'index.html'));
+    candidates.push(path.join(cleanPath, 'index.html'));
   } else {
-    const cleanPath = pathname.replace(/^\/+/, '');
     candidates.push(cleanPath);
     if (!path.extname(cleanPath)) {
       candidates.push(`${cleanPath}.html`);
@@ -496,28 +504,35 @@ async function resolveStaticFile(staticRoot, pathname) {
     }
   }
 
-  for (const candidate of candidates) {
-    const candidatePath = path.join(staticRoot, candidate);
-    if (!isSafePath(staticRoot, candidatePath)) {
-      continue;
-    }
+  const rootsToTry = [staticRoot];
+  if (fallbackRoot && cleanPath && !cleanPath.includes('/') && ROOT_STATIC_FALLBACKS.has(cleanPath)) {
+    rootsToTry.push(fallbackRoot);
+  }
 
-    try {
-      const stat = await fsp.stat(candidatePath);
-      if (stat.isFile()) {
-        return candidatePath;
+  for (const baseRoot of rootsToTry) {
+    for (const candidate of candidates) {
+      const candidatePath = path.join(baseRoot, candidate);
+      if (!isSafePath(baseRoot, candidatePath)) {
+        continue;
       }
-    } catch (_) {
-      continue;
+
+      try {
+        const stat = await fsp.stat(candidatePath);
+        if (stat.isFile()) {
+          return candidatePath;
+        }
+      } catch (_) {
+        continue;
+      }
     }
   }
 
   return null;
 }
 
-async function serveStatic(staticRoot, reqUrl, res, method = 'GET') {
+async function serveStatic(staticRoot, reqUrl, res, method = 'GET', fallbackRoot = null) {
   const pathname = decodeURIComponent(reqUrl.pathname);
-  const filePath = await resolveStaticFile(staticRoot, pathname);
+  const filePath = await resolveStaticFile(staticRoot, pathname, fallbackRoot);
 
   if (!filePath) {
     sendJson(res, 404, { error: 'Not found' });
@@ -1290,7 +1305,7 @@ function createServer(options = {}) {
       return;
     }
 
-    await serveStatic(config.staticRoot, reqUrl, res, req.method);
+    await serveStatic(config.staticRoot, reqUrl, res, req.method, config.publicRoot || config.root);
   });
 
   let cleanupTimer = null;

@@ -156,8 +156,26 @@ function setFetchStatus(msg, type) {
   if (!fetchStatus) return;
   fetchStatus.textContent = msg || '';
   fetchStatus.className = 'data-age';
+  fetchStatus.removeAttribute('aria-busy');
+  if (type === 'loading') {
+    fetchStatus.classList.add('loading');
+    fetchStatus.setAttribute('aria-busy', 'true');
+  }
   if (type === 'ok') fetchStatus.classList.add('fresh');
   if (type === 'err') fetchStatus.classList.add('stale');
+}
+
+function showOverlay(mode = 'help') {
+  if (!noDataOverlay) return;
+  noDataOverlay.dataset.mode = mode;
+  noDataOverlay.style.display = 'flex';
+  noDataOverlay.setAttribute('aria-hidden', 'false');
+}
+
+function hideOverlay() {
+  if (!noDataOverlay) return;
+  noDataOverlay.style.display = 'none';
+  noDataOverlay.setAttribute('aria-hidden', 'true');
 }
 
 function buildClubMap(players) {
@@ -173,8 +191,10 @@ function buildClubMap(players) {
 
 async function fetchAndApplyRemoteData() {
   if (!fetchRemoteBtn) return;
+  const shouldBlockWithOverlay = !ALL_VALUES.length;
   fetchRemoteBtn.disabled = true;
-  setFetchStatus('Henter fra DBf...', '');
+  if (shouldBlockWithOverlay) showOverlay('loading');
+  setFetchStatus('Henter fra DBf...', 'loading');
   try {
     const res = await fetch(REMOTE_HAC_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -191,8 +211,10 @@ async function fetchAndApplyRemoteData() {
     setFetchStatus('Hentet fra DBf', 'ok');
   } catch (err) {
     setFetchStatus('Kunne ikke hente online data', 'err');
+    if (shouldBlockWithOverlay) showOverlay('help');
     alert('Kunne ikke hente HACAlle.php automatisk: ' + err.message + '\n\nPrøv igen om lidt eller hent data på ny fra DBf.');
   } finally {
+    if (!shouldBlockWithOverlay) hideOverlay();
     fetchRemoteBtn.disabled = false;
   }
 }
@@ -389,7 +411,7 @@ function applyNewData(clubData, timestamp) {
     el.className = 'data-age ' + (age > MAX_AGE_MS ? 'stale' : 'fresh');
   }
 
-  noDataOverlay.style.display = 'none';
+  hideOverlay();
   selectedClubs.length = 0;
   pillArea.innerHTML = '';
   searchEl.value = '';
@@ -805,21 +827,21 @@ document.addEventListener('DOMContentLoaded', () => {
     ['sN', 'sMean', 'sMedian', 'sMin', 'sMax', 'sStd'].forEach(id => {
       document.getElementById(id).textContent = '—';
     });
-    noDataOverlay.style.display = 'flex';
+    showOverlay('help');
     syncActiveUrl();
   });
 
   helpBtn.addEventListener('click', () => {
-    noDataOverlay.style.display = 'flex';
+    showOverlay('help');
   });
 
   closeOverlayBtn.addEventListener('click', () => {
-    noDataOverlay.style.display = 'none';
+    hideOverlay();
   });
 
   if (fetchRemoteBtn) {
     fetchRemoteBtn.addEventListener('click', () => {
-      noDataOverlay.style.display = 'none';
+      hideOverlay();
       fetchAndApplyRemoteData();
     });
   }

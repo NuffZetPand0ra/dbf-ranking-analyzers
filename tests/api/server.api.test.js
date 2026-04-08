@@ -1,4 +1,5 @@
 const assert = require('assert');
+const path = require('path');
 const request = require('supertest');
 const nock = require('nock');
 const { createTestServer } = require('../helpers/test-server');
@@ -196,8 +197,12 @@ describe('API server', () => {
     assert.strictEqual(res.text, undefined);
   });
 
-  it('supports HEAD on static sitemap.xml', async () => {
-    const server = createTestServer();
+  it('supports HEAD on static sitemap.xml without a built _site folder', async () => {
+    const server = createTestServer({
+      config: {
+        staticRoot: path.join(process.cwd(), '.missing-site-for-test'),
+      },
+    });
 
     const res = await request(server).head('/sitemap.xml');
 
