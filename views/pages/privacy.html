@@ -1,0 +1,60 @@
+---
+layout: base.hbs
+title: Privatliv og cookies
+ogTitle: Privatliv og cookies
+description: Kort information om privatliv, cookies, cache og brug af offentligt tilgængelige DBf-data på DBf Ranking Analyzers.
+appleTitle: Privatliv
+canonical: https://dbf-ranking-analyzers.onrender.com/privacy/
+stylesheets:
+  - /css/analyzer-theme.css
+bodyScripts:
+  - /js/theme.js
+permalink: /privacy/index.html
+---
+<main class="page">
+<header>
+  {{> analyzer_header headerRowClass="page-header" title="Privatliv og cookies" titleClass="page-title" subtitle="Kort forklaring af hvilke data der vises, hvordan de lagres, og hvordan de relaterer sig til DBf's offentlige data." subtitleClass="page-subtitle"}}
+</header>
+
+<section class="card" style="padding:1rem 1.1rem; display:grid; gap:1rem; line-height:1.7;">
+  <div>
+    <span class="lbl">Kort version</span>
+    <p>Dette site bruger ikke tracking- eller marketingcookies. Værktøjerne er uofficielle og viser analyser af handicap- og turneringsdata fra DBf, som allerede er offentligt tilgængelige via <a href="https://bridge.dk" target="_blank" rel="noopener noreferrer">bridge.dk</a>.</p>
+  </div>
+
+  <div>
+    <span class="lbl">Hvilke oplysninger behandles</span>
+    <ul style="padding-left:1.2rem; color:var(--muted); display:grid; gap:0.35rem;">
+      <li>navne og DBf-numre</li>
+      <li>handicap og handicaphistorik</li>
+      <li>turneringsnavne, datoer, klubber/arrangører og spillesteder</li>
+      <li>relationer mellem spillere, når de kan udledes fra offentlige turneringsresultater</li>
+    </ul>
+  </div>
+
+  <div>
+    <span class="lbl">Kilde og datagrundlag</span>
+    <p>Oplysningerne stammer fra DBf's offentligt tilgængelige sider på bridge.dk. Denne side fungerer som et uofficielt analyse- og visningslag oven på disse data og læner sig derfor op ad den offentliggørelse, som DBf allerede foretager.</p>
+    <p>Det oprindelige ansvar for indsamling, offentliggørelse og eventuelt behandlingsgrundlag for kildedata ligger hos DBf. Hvis du vil vide mere om DBf's egne databeskyttelsesvilkår eller aftaler, bør du se DBf/bridge.dk's egne oplysninger og politikker.</p>
+  </div>
+
+  <div>
+    <span class="lbl">Lokal lagring og cache</span>
+    <p>Din browser kan gemme temaindstilling og midlertidige cachedata i <code>localStorage</code>, så siden loader hurtigere og husker dit valgte tema. Serveren gemmer også midlertidige cachekopier for at reducere belastning mod DBf's kildesider. Der bruges ikke cookies til annoncering, statistik eller profilering.</p>
+  </div>
+
+  <div>
+    <span class="lbl">Formål</span>
+    <p>Formålet er at gøre offentligt tilgængelige DBf-data lettere at analysere og visualisere for bridgeinteresserede brugere. Sitet er ikke officielt tilknyttet DBf og må ikke opfattes som DBf's egen tjeneste.</p>
+  </div>
+
+  <div>
+    <span class="lbl">Rettelser eller henvendelser</span>
+    <p>Hvis du mener, at en oplysning bør rettes eller fjernes fra dette site, kan du <a href="https://github.com/NuffZetPand0ra/dbf-ranking-analyzers/issues/new" target="_blank" rel="noopener noreferrer">kontakte skaberen via GitHub</a>. Hvis den underliggende oplysning stammer fra DBf og er forkert ved kilden, bør du også kontakte DBf.</p>
+  </div>
+
+  <p style="color:var(--muted); font-size:0.8rem;"><strong>Sidst opdateret:</strong> 8. april 2026</p>
+</section>
+
+{{> footer wrapperClass="page-footer"}}
+</main>
