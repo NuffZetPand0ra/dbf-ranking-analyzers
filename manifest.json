@@ -35,6 +35,32 @@
     }
   ],
   "categories": ["utilities", "games"],
+  "shortcuts": [
+    {
+      "name": "Handicap comparison",
+      "short_name": "Comparison",
+      "description": "Compare handicap development for multiple DBf players",
+      "url": "/tools/handicap-comparison/"
+    },
+    {
+      "name": "Handicap distribution",
+      "short_name": "Distribution",
+      "description": "Explore handicap distribution across clubs",
+      "url": "/tools/handicap-distribution/"
+    },
+    {
+      "name": "Player badge",
+      "short_name": "Badge",
+      "description": "Generate a shareable DBf player badge",
+      "url": "/tools/player-badge/"
+    },
+    {
+      "name": "Hvor & Hvem",
+      "short_name": "Where & Who",
+      "description": "See where a player has played and with whom",
+      "url": "/tools/where-played/"
+    }
+  ],
   "screenshots": [
     {
       "src": "",
