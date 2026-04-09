@@ -11,7 +11,7 @@ This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENS
 
 ## What It Does
 
-This project provides five browser-based analyzers:
+This project provides four browser-based analyzers:
 
 1. **Handicap comparison**
    Compare handicap development for multiple DBf players over time.
@@ -22,11 +22,10 @@ This project provides five browser-based analyzers:
 3. **Player badge**
    Generate a shareable badge for a single player with HC history, forecast via linear regression, stability score, and national/club percentile.
 
-4. **If-Only analyzer**
-   Replay your HC history excluding a specific club or partner to see the alternative trajectory. Supports both club-based and player-based exclusions with partner inference from tournament data.
-
-5. **Hvor & Hvem (Where & Who)**
+4. **Hvor & Hvem (Where & Who)**
    Explore where a player has played and with whom. Expandable partner tree with club, tournament title, HC adjustments, and direct links to bridge.dk. Cross-reference partners by location and locations by partner.
+
+There is also a hidden **If-Only analyzer** easter egg — see below for how to access it.
 
 The site is built as static pages with Eleventy and uses a small Node relay for DBf requests so the browser can fetch data without CORS issues.
 
@@ -36,8 +35,9 @@ The site is built as static pages with Eleventy and uses a small Node relay for 
 - `/tools/handicap-comparison/`: Player handicap comparison
 - `/tools/handicap-distribution/`: Handicap distribution by club
 - `/tools/player-badge/`: Player badge with HC forecast
-- `/tools/if-only/`: If-Only analyzer
 - `/tools/where-played/`: Hvor & Hvem
+- `/privacy/`: Privacy page
+- `/tools/if-only/`: If-Only analyzer *(hidden easter egg)*
 
 ## How To Use
 
@@ -65,15 +65,6 @@ The site is built as static pages with Eleventy and uses a small Node relay for 
 - Forecast future HC via linear regression with optimism slider
 - See stability score and national/club percentile
 
-### If-Only analyzer
-
-- Open `/tools/if-only/`
-- Search for a player by name or DBf number
-- Toggle between club and player exclusion mode
-- Select a club or partner to exclude
-- Compare the actual HC curve with the alternative trajectory
-- Share via URL with preselected player and source
-
 ### Hvor & Hvem
 
 - Open `/tools/where-played/`
@@ -82,6 +73,27 @@ The site is built as static pages with Eleventy and uses a small Node relay for 
 - Expand a partner row to see individual tournaments with date, club, title, and HC adjustment
 - View all locations with tournament count
 - Cross-reference: select a location to see partners, or a partner to see locations
+
+### Privacy page
+
+- Open `/privacy/`
+- Brief overview of what data is shown, how it is cached, and how it relates to DBf's publicly available data
+- No tracking or marketing cookies are used
+
+### If-Only analyzer *(easter egg)*
+
+The If-Only analyzer is not listed on the dashboard. To access it:
+
+- Type `hvis` on the dashboard to be redirected automatically
+- Or navigate directly to `/tools/if-only/`
+
+Once open:
+
+- Search for a player by name or DBf number
+- Toggle between club and player exclusion mode
+- Select a club or partner to exclude
+- Compare the actual HC curve with the alternative trajectory
+- Share via URL with preselected player and source
 
 ## Run Locally
 
