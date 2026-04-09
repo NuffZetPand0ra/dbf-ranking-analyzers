@@ -43,11 +43,16 @@ permalink: /tools/player-badge/index.html
     <div><span class="lbl">Prognose fra</span><input type="date" id="badge-to"></div>
     <div>
       <span class="lbl">Prognosemodel</span>
-      <select id="badge-pred-type">
-        <option value="weighted">Vægtet lineær</option>
-        <option value="linear">Lineær</option>
-        <option value="holt">Holt trend</option>
-      </select>
+      <div class="badge-model-picker">
+        <select id="badge-pred-type">
+          <option value="weighted">Vægtet lineær</option>
+          <option value="linear">Lineær</option>
+          <option value="holt">Holt trend</option>
+        </select>
+        <button type="button" class="help-btn badge-model-help-btn" id="badge-model-help-btn" aria-haspopup="dialog" aria-controls="badge-model-dialog">
+          ? Om modeller
+        </button>
+      </div>
     </div>
     <div>
       <span class="lbl">Prognose (mdr.)</span>
@@ -76,21 +81,35 @@ permalink: /tools/player-badge/index.html
   </div>
 </div>
 
-<section class="badge-model-notes" aria-labelledby="badge-model-notes-title">
-  <h2 id="badge-model-notes-title">Om prognosemodeller</h2>
-  <p>Vælg den model, der passer bedst til spillerens udvikling:</p>
-  <ul>
-    <li><strong>Lineær:</strong> En klassisk ret linje gennem perioden. God som neutral baseline.
-      <a href="https://en.wikipedia.org/wiki/Linear_regression" target="_blank" rel="noopener noreferrer">Wikipedia: Linear regression</a>
-    </li>
-    <li><strong>Vægtet lineær:</strong> Som lineær, men nyere resultater vægter mere end ældre.
-      <a href="https://en.wikipedia.org/wiki/Weighted_least_squares" target="_blank" rel="noopener noreferrer">Wikipedia: Weighted least squares</a>
-    </li>
-    <li><strong>Holt trend:</strong> Trend-udglatning med fokus på nyere bevægelser og momentum.
-      <a href="https://en.wikipedia.org/wiki/Exponential_smoothing#Double_exponential_smoothing" target="_blank" rel="noopener noreferrer">Wikipedia: Double exponential smoothing</a>
-    </li>
-  </ul>
-</section>
+<dialog class="badge-model-dialog" id="badge-model-dialog" aria-labelledby="badge-model-dialog-title">
+  <div class="badge-model-dialog-card">
+    <div class="badge-model-dialog-head">
+      <div>
+        <p class="badge-model-dialog-kicker">Prognosehjælp</p>
+        <h2 id="badge-model-dialog-title">Om prognosemodeller</h2>
+      </div>
+      <button type="button" class="badge-model-dialog-close" id="badge-model-dialog-close" aria-label="Luk popup">✕</button>
+    </div>
+
+    <p class="badge-model-dialog-lead">Vælg den model, der passer bedst til spillerens udvikling:</p>
+
+    <ul class="badge-model-dialog-list">
+      <li><strong>Lineær:</strong> En klassisk ret linje gennem perioden. God som neutral baseline.
+        <a href="https://en.wikipedia.org/wiki/Linear_regression" target="_blank" rel="noopener noreferrer">Wikipedia: Linear regression</a>
+      </li>
+      <li><strong>Vægtet lineær:</strong> Som lineær, men nyere resultater vægter mere end ældre.
+        <a href="https://en.wikipedia.org/wiki/Weighted_least_squares" target="_blank" rel="noopener noreferrer">Wikipedia: Weighted least squares</a>
+      </li>
+      <li><strong>Holt trend:</strong> Trend-udglatning med fokus på nyere bevægelser og momentum.
+        <a href="https://en.wikipedia.org/wiki/Exponential_smoothing#Double_exponential_smoothing" target="_blank" rel="noopener noreferrer">Wikipedia: Double exponential smoothing</a>
+      </li>
+    </ul>
+
+    <div class="badge-model-dialog-actions">
+      <button type="button" class="add-btn" id="badge-model-dialog-dismiss">Luk</button>
+    </div>
+  </div>
+</dialog>
 
 <!-- ── Empty state ─────────────────────────────────────────── -->
 <div class="badge-empty" id="badge-empty">Søg efter en spiller ovenfor for at generere et badge.</div>

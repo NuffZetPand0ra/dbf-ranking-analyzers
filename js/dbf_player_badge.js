@@ -25,6 +25,10 @@ const fromEl        = document.getElementById('badge-from');
 const toEl          = document.getElementById('badge-to');
 const predEnabledEl = document.getElementById('badge-pred-enabled');
 const predTypeEl    = document.getElementById('badge-pred-type');
+const modelHelpBtnEl = document.getElementById('badge-model-help-btn');
+const modelDialogEl = document.getElementById('badge-model-dialog');
+const modelDialogCloseEl = document.getElementById('badge-model-dialog-close');
+const modelDialogDismissEl = document.getElementById('badge-model-dialog-dismiss');
 const predMonthsEl  = document.getElementById('badge-pred-months');
 const regMonthsEl   = document.getElementById('badge-reg-months');
 const optimismEl    = document.getElementById('badge-optimism');
@@ -125,6 +129,24 @@ function setStatus(msg, cls) {
   statusEl.className = 'fetch-status' + (cls ? ' ' + cls : '');
   clearTimeout(_statusTimer);
   if (cls === 'ok') _statusTimer = setTimeout(() => { statusEl.textContent = ''; }, 3000);
+}
+
+function openModelDialog() {
+  if (!modelDialogEl) return;
+  if (typeof modelDialogEl.showModal === 'function') {
+    if (!modelDialogEl.open) modelDialogEl.showModal();
+    return;
+  }
+  modelDialogEl.setAttribute('open', 'open');
+}
+
+function closeModelDialog() {
+  if (!modelDialogEl) return;
+  if (typeof modelDialogEl.close === 'function') {
+    if (modelDialogEl.open) modelDialogEl.close();
+    return;
+  }
+  modelDialogEl.removeAttribute('open');
 }
 
 // ── Autocomplete ──────────────────────────────────────────────────────────────
@@ -1004,6 +1026,26 @@ optimismEl.addEventListener('input', () => {
   optValEl.textContent = parseFloat(optimismEl.value).toFixed(1);
   render();
 });
+
+if (modelHelpBtnEl) {
+  modelHelpBtnEl.addEventListener('click', openModelDialog);
+}
+
+if (modelDialogCloseEl) {
+  modelDialogCloseEl.addEventListener('click', closeModelDialog);
+}
+
+if (modelDialogDismissEl) {
+  modelDialogDismissEl.addEventListener('click', closeModelDialog);
+}
+
+if (modelDialogEl) {
+  modelDialogEl.addEventListener('click', event => {
+    if (event.target === modelDialogEl) {
+      closeModelDialog();
+    }
+  });
+}
 
 if (embedBtnEl) {
   embedBtnEl.addEventListener('click', copyEmbedCode);
