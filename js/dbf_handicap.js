@@ -384,13 +384,21 @@ function buildGroupDs(group, labels, gran) {
     return b;
   });
 
-  return labels.map(k => {
-    const vals = [];
-    for (const b of memberBuckets) {
-      if (b[k]) {
-        vals.push(b[k].reduce((a, c) => a + c, 0) / b[k].length);
-      }
-    }
+  // For each member, build a carry-forward value per label so gaps don't
+  // drop members from the average (which would cause the average to spike
+  // toward the lone member that does have data that week).
+  const memberCarryForward = memberBuckets.map(b => {
+    let last = null;
+    return labels.map(k => {
+      if (b[k]) last = b[k].reduce((a, c) => a + c, 0) / b[k].length;
+      return last;
+    });
+  });
+
+  return labels.map((k, idx) => {
+    const vals = memberCarryForward
+      .map(cf => cf[idx])
+      .filter(v => v !== null);
     if (!vals.length) return null;
     return parseFloat((vals.reduce((a, c) => a + c, 0) / vals.length).toFixed(2));
   });
